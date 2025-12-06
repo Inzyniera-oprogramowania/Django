@@ -40,6 +40,24 @@ jobs:
       - name: Checkout Code Repository
         uses: actions/checkout@v6
 
+      - name: Create dummy .env files for CI
+        run: |
+          mkdir -p .envs/.local
+          # Tworzymy plik .django z domyślnymi wartościami pod testy
+          echo "USE_DOCKER=yes" >> .envs/.local/.django
+          echo "IPYTHONDIR=/app/.ipython" >> .envs/.local/.django
+          echo "REDIS_URL=redis://redis:6379/0" >> .envs/.local/.django
+          echo "CELERY_BROKER_URL=redis://redis:6379/0" >> .envs/.local/.django
+          echo "DJANGO_DEBUG=True" >> .envs/.local/.django
+          echo "DJANGO_SECRET_KEY=dummy-key-for-ci-tests-only" >> .envs/.local/.django
+          echo "DJANGO_ALLOWED_HOSTS=*" >> .envs/.local/.django
+          
+          echo "POSTGRES_HOST=postgres" >> .envs/.local/.postgres
+          echo "POSTGRES_PORT=5432" >> .envs/.local/.postgres
+          echo "POSTGRES_DB=pollution_backend" >> .envs/.local/.postgres
+          echo "POSTGRES_USER=debug" >> .envs/.local/.postgres
+          echo "POSTGRES_PASSWORD=debug" >> .envs/.local/.postgres
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
