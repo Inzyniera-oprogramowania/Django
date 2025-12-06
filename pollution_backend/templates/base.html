@@ -1,4 +1,5 @@
 {% load static i18n %}
+
 <!DOCTYPE html>
 {% get_current_language as LANGUAGE_CODE %}
 <html lang="{{ LANGUAGE_CODE }}">
@@ -13,19 +14,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="Pollution IoT Backend API" />
     <meta name="author" content="Bartosz Rasztar" />
-    
     <link rel="icon" href="{% static 'images/favicons/favicon.ico' %}" />
-
     {% block css %}
       <link rel="stylesheet"
             href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.2.3/css/bootstrap.min.css"
             integrity="sha512-SbiR/eusphKoMVVXysTKG/7VseWii+Y3FdHrt0EpKgpToZeemhqHeZeLWLhJutz/2ut2Vw1uQEj2MbRF+TVBUA=="
             crossorigin="anonymous"
             referrerpolicy="no-referrer" />
-      
       <link href="{% static 'css/project.css' %}" rel="stylesheet" />
     {% endblock css %}
-
     {% block javascript %}
       <script defer
               src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.2.3/js/bootstrap.min.js"
@@ -35,7 +32,6 @@
       <script defer src="{% static 'js/project.js' %}"></script>
     {% endblock javascript %}
   </head>
-
   <body>
     {% block body %}
       <div class="container mt-5">
@@ -50,18 +46,17 @@
             </div>
           {% endfor %}
         {% endif %}
-
         {% block content %}
           <div class="text-center">
             <h1>Pollution IoT Backend</h1>
             <p class="lead">To jest API. Frontend dostępny jest pod innym adresem.</p>
-            <p><a href="/admin/" class="btn btn-outline-primary">Panel Administratora</a></p>
+            <p>
+              <a href="{% url 'admin:index' %}" class="btn btn-outline-primary">Panel Administratora</a>
+            </p>
           </div>
         {% endblock content %}
-        
       </div>
     {% endblock body %}
-
     {% block inline_javascript %}
     {% endblock inline_javascript %}
   </body>
