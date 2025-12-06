@@ -51,7 +51,7 @@ jobs:
           echo "DJANGO_DEBUG=True" >> .envs/.local/.django
           echo "DJANGO_SECRET_KEY=dummy-key-for-ci-tests-only" >> .envs/.local/.django
           echo "DJANGO_ALLOWED_HOSTS=*" >> .envs/.local/.django
-          
+
           echo "POSTGRES_HOST=postgres" >> .envs/.local/.postgres
           echo "POSTGRES_PORT=5432" >> .envs/.local/.postgres
           echo "POSTGRES_DB=pollution_backend" >> .envs/.local/.postgres

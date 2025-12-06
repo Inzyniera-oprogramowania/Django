@@ -46,6 +46,9 @@ updates:
     # Every weekday
     schedule:
       interval: 'daily'
+    ignore:
+      - dependency-name: "postgres"
+      - dependency-name: "timescale/timescaledb"
 
   # Enable version updates for Docker Compose files
   - package-ecosystem: 'docker-compose'
@@ -54,6 +57,10 @@ updates:
     # Every weekday
     schedule:
       interval: 'daily'
+    ignore:
+      - dependency-name: "postgres"
+      - dependency-name: "timescale/timescaledb"
+      - dependency-name: "redis"
 
   # Enable version updates for Python/Pip - Production
   - package-ecosystem: 'pip'
@@ -63,6 +70,10 @@ updates:
     # Every weekday
     schedule:
       interval: 'daily'
+    ignore:
+      - dependency-name: "django"
+        update-types:
+          - "version-update:semver-major"
     groups:
       python:
         update-types:
