@@ -23,7 +23,10 @@ urlpatterns = [
     path("users/", include("pollution_backend.users.api.urls", namespace="users")),
     path("accounts/", include("allauth.urls")),
     # Your stuff: custom urls includes go here
-    # ...
+    path(
+        "sensors/",
+        include("pollution_backend.sensors.api.urls", namespace="sensors"),
+    ),
     # Media files
     *static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT),
 ]
