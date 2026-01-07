@@ -28,10 +28,8 @@ class TestUserViewSet:
 
         response = view.me(request)  # type: ignore[call-arg, arg-type, misc]
 
-        assert response.data == {
-            "id": user.id,
-            "email": user.email,
-            "is_staff": user.is_staff,
-            "is_active": user.is_active,
-        }
+        assert response.data["id"] == user.id
+        assert response.data["email"] == user.email
+        assert response.data["is_staff"] == user.is_staff
+        assert response.data["is_active"] == user.is_active
         assert "date_joined" in response.data
