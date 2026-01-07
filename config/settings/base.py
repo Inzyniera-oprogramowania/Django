@@ -1,6 +1,7 @@
 # ruff: noqa: ERA001, E501
 """Base settings to build other settings files upon."""
 
+import os
 import ssl
 from pathlib import Path
 
@@ -45,11 +46,19 @@ LOCALE_PATHS = [str(BASE_DIR / "locale")]
 
 # DATABASES
 # ------------------------------------------------------------------------------
-# https://docs.djangoproject.com/en/dev/ref/settings/#databases
-DATABASES = {"default": env.db("DATABASE_URL")}
+DATABASES = {
+    "default": env.db("DATABASE_URL"),
+    "timeseries": env.db("TIMESCALE_URL"),
+}
+
 DATABASES["default"]["ENGINE"] = "django.contrib.gis.db.backends.postgis"
+DATABASES["timeseries"]["ENGINE"] = "django.db.backends.postgresql"
+
 DATABASES["default"]["ATOMIC_REQUESTS"] = True
-# https://docs.djangoproject.com/en/stable/ref/settings/#std:setting-DEFAULT_AUTO_FIELD
+DATABASES["timeseries"]["ATOMIC_REQUESTS"] = True
+
+DATABASE_ROUTERS = ["config.routers.PollutionRouter"]
+
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # URLS
@@ -90,6 +99,10 @@ THIRD_PARTY_APPS = [
 LOCAL_APPS = [
     "pollution_backend.users",
     "pollution_backend.sensors",
+    "pollution_backend.measurements",
+    "pollution_backend.alerts",
+    "pollution_backend.forecasts",
+    "pollution_backend.reports",
     "pollution_backend.realtime",
     # Your stuff: custom apps go here
 ]
@@ -355,7 +368,8 @@ SPECTACULAR_SETTINGS = {
 }
 # Your stuff...
 # ------------------------------------------------------------------------------
-import os
 
 if os.environ.get("USE_DOCKER") == "yes":
     GDAL_LIBRARY_PATH = "/usr/lib/x86_64-linux-gnu/libgdal.so"
+
+AUTH_USER_MODEL = "users.User"

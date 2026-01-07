@@ -1,3 +1,4 @@
+
 volumes:
   pollution_backend_local_postgres_data: {}
   pollution_backend_local_postgres_data_backups: {}
@@ -27,13 +28,15 @@ services:
     build:
       context: .
       dockerfile: ./compose/production/postgres/Dockerfile
-    image: timescale/timescaledb-ha:pg15-postgis
+    image: postgis/postgis:15-3.3
     container_name: pollution_backend_local_postgres
     volumes:
       - pollution_backend_local_postgres_data:/var/lib/postgresql/data
       - pollution_backend_local_postgres_data_backups:/backups
     env_file:
       - ./.envs/.local/.postgres
+    ports:
+      - "5432:5432"
 
   redis:
     image: docker.io/redis:7.2
