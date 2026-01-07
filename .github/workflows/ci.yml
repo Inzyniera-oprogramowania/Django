@@ -51,6 +51,7 @@ jobs:
           echo "DJANGO_DEBUG=True" >> .envs/.local/.django
           echo "DJANGO_SECRET_KEY=dummy-key-for-ci-tests-only" >> .envs/.local/.django
           echo "DJANGO_ALLOWED_HOSTS=*" >> .envs/.local/.django
+          echo "TIMESCALE_URL=postgres://debug:debug@postgres:5432/pollution_backend" >> .envs/.local/.django
 
           echo "POSTGRES_HOST=postgres" >> .envs/.local/.postgres
           echo "POSTGRES_PORT=5432" >> .envs/.local/.postgres
@@ -83,6 +84,14 @@ jobs:
           set: |
             docs.cache-from=type=gha,scope=cached-docs
             docs.cache-to=type=gha,scope=cached-docs,mode=max
+
+      - name: Create Legacy User Table (Fix for managed=False)
+        run: |
+          docker compose -f docker-compose.local.yml up -d postgres
+          echo "Waiting for PostgreSQL to start..."
+          sleep 10 
+          
+          docker compose -f docker-compose.local.yml exec -T postgres psql -U debug -d pollution_backend -c 'CREATE TABLE IF NOT EXISTS "User" (id BIGSERIAL PRIMARY KEY, email VARCHAR(255) UNIQUE NOT NULL, password VARCHAR(128) NOT NULL, last_login TIMESTAMPTZ, is_superuser BOOLEAN DEFAULT FALSE, is_staff BOOLEAN DEFAULT FALSE, is_active BOOLEAN DEFAULT TRUE, date_joined TIMESTAMPTZ DEFAULT NOW());'
 
       - name: Check DB Migrations
         run: docker compose -f docker-compose.local.yml run --rm django python manage.py makemigrations --check
