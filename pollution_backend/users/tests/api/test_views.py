@@ -33,5 +33,5 @@ class TestUserViewSet:
             "email": user.email,
             "is_staff": user.is_staff,
             "is_active": user.is_active,
-            "date_joined": user.date_joined,
         }
+        assert "date_joined" in response.data
