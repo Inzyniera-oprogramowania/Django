@@ -3,7 +3,9 @@
 import django.contrib.gis.db.models.fields
 import django.utils.timezone
 from django.db import migrations, models
+import sys
 
+TESTING = 'pytest' in sys.modules
 
 class Migration(migrations.Migration):
 
@@ -27,7 +29,7 @@ class Migration(migrations.Migration):
             ],
             options={
                 'db_table': '"User"',
-                'managed': False,
+                'managed': TESTING,
             },
         ),
         migrations.CreateModel(
@@ -39,7 +41,7 @@ class Migration(migrations.Migration):
             ],
             options={
                 'db_table': 'advanceduser',
-                'managed': False,
+                'managed': TESTING,
             },
         ),
         migrations.CreateModel(
@@ -54,7 +56,7 @@ class Migration(migrations.Migration):
             ],
             options={
                 'db_table': 'institution',
-                'managed': False,
+                'managed': TESTING,
             },
         ),
         migrations.CreateModel(
@@ -67,7 +69,7 @@ class Migration(migrations.Migration):
             ],
             options={
                 'db_table': 'resident',
-                'managed': False,
+                'managed': TESTING,
             },
         ),
     ]
