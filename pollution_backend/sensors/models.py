@@ -1,5 +1,9 @@
+import sys
+
 from django.contrib.gis.db import models as geomodels
 from django.db import models
+
+TESTING = "pytest" in sys.modules
 
 
 class Pollutant(models.Model):
@@ -9,7 +13,7 @@ class Pollutant(models.Model):
 
     class Meta:
         db_table = "pollutant"
-        managed = False
+        managed = TESTING
 
     def __str__(self):
         return self.symbol
@@ -24,7 +28,7 @@ class Location(models.Model):
 
     class Meta:
         db_table = "location"
-        managed = False
+        managed = TESTING
 
     def __str__(self):
         return self.full_address or f"Location {self.id}"
@@ -44,7 +48,7 @@ class MonitoringStation(models.Model):
 
     class Meta:
         db_table = "monitoringstation"
-        managed = False
+        managed = TESTING
 
     def __str__(self):
         return self.station_code
@@ -70,7 +74,7 @@ class Sensor(models.Model):
 
     class Meta:
         db_table = "sensor"
-        managed = False
+        managed = TESTING
 
     def __str__(self):
         return f"{self.sensor_type} ({self.serial_number or 'No Serial'})"
@@ -90,7 +94,7 @@ class QualityNorm(models.Model):
 
     class Meta:
         db_table = "qualitynorm"
-        managed = False
+        managed = TESTING
 
     def __str__(self):
         return f"{self.pollutant.symbol} - {self.norm_type} ({self.threshold_value})"
@@ -104,7 +108,7 @@ class AnomalyLog(models.Model):
 
     class Meta:
         db_table = "anomalylog"
-        managed = False
+        managed = TESTING
 
     def __str__(self):
         return f"Anomaly: {self.description[:30]}..."

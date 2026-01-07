@@ -1,5 +1,9 @@
+import sys
+
 from django.contrib.gis.db import models as geomodels
 from django.db import models
+
+TESTING = "pytest" in sys.modules
 
 
 class ForecastArea(models.Model):
@@ -9,7 +13,7 @@ class ForecastArea(models.Model):
 
     class Meta:
         db_table = "forecastarea"
-        managed = False
+        managed = TESTING
 
     def __str__(self):
         return self.name
@@ -27,7 +31,7 @@ class Forecast(models.Model):
 
     class Meta:
         db_table = "forecast"
-        managed = False
+        managed = TESTING
 
     def __str__(self):
         return f"Forecast for {self.forecast_area.name} on {self.forecast_date}"
@@ -49,7 +53,7 @@ class ForecastPollutant(models.Model):
 
     class Meta:
         db_table = "forecastpollutant"
-        managed = False
+        managed = TESTING
 
     def __str__(self):
         return f"{self.pollutant} in {self.forecast}"

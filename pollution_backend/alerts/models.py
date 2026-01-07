@@ -1,5 +1,9 @@
+import sys
+
 from django.conf import settings
 from django.db import models
+
+TESTING = "pytest" in sys.modules
 
 
 class Alert(models.Model):
@@ -21,7 +25,7 @@ class Alert(models.Model):
 
     class Meta:
         db_table = "alert"
-        managed = False
+        managed = TESTING
 
     def __str__(self):
         return f"{self.level}: {self.message[:20]}"
@@ -40,7 +44,7 @@ class AlertRecipient(models.Model):
 
     class Meta:
         db_table = "alertrecipient"
-        managed = False
+        managed = TESTING
 
     def __str__(self):
         return f"Recipient: {self.user} for Alert {self.alert_id}"

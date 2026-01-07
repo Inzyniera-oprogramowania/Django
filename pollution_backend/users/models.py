@@ -1,9 +1,13 @@
+import sys
+
 from django.contrib.auth.models import AbstractBaseUser
 from django.contrib.auth.models import BaseUserManager
 from django.contrib.auth.models import PermissionsMixin
 from django.contrib.gis.db import models as geomodels
 from django.db import models
 from django.utils import timezone
+
+TESTING = "pytest" in sys.modules
 
 
 class CustomUserManager(BaseUserManager):
@@ -34,7 +38,7 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     class Meta:
         db_table = '"User"'
-        managed = False
+        managed = TESTING
 
     def __str__(self):
         return self.email
@@ -49,7 +53,7 @@ class Institution(models.Model):
 
     class Meta:
         db_table = "institution"
-        managed = False
+        managed = TESTING
 
     def __str__(self):
         return self.name
@@ -74,7 +78,7 @@ class AdvancedUser(models.Model):
 
     class Meta:
         db_table = "advanceduser"
-        managed = False
+        managed = TESTING
 
     def __str__(self):
         return f"Expert: {self.user.email}"
@@ -93,7 +97,7 @@ class Resident(models.Model):
 
     class Meta:
         db_table = "resident"
-        managed = False
+        managed = TESTING
 
     def __str__(self):
         return f"Resident: {self.user.email}"

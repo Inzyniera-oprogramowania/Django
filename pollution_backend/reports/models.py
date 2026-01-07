@@ -1,4 +1,8 @@
+import sys
+
 from django.db import models
+
+TESTING = "pytest" in sys.modules
 
 
 class Report(models.Model):
@@ -13,7 +17,7 @@ class Report(models.Model):
 
     class Meta:
         db_table = "report"
-        managed = False
+        managed = TESTING
 
     def __str__(self):
         return self.title
@@ -29,7 +33,7 @@ class ReportScope(models.Model):
 
     class Meta:
         db_table = "reportscope"
-        managed = False
+        managed = TESTING
 
     def __str__(self):
         return f"{self.report.title} - {self.pollutant}"
