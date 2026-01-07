@@ -10,7 +10,6 @@ from pollution_backend.users.models import User
 
 class UserFactory(DjangoModelFactory[User]):
     email = Faker("email")
-    name = Faker("name")
 
     @post_generation
     def password(self, create: bool, extracted: Sequence[Any], **kwargs):  # noqa: FBT001

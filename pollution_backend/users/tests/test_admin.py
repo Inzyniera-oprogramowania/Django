@@ -11,6 +11,7 @@ from pytest_django.asserts import assertRedirects
 from pollution_backend.users.models import User
 
 
+@pytest.mark.django_db(databases=["default", "timeseries"])
 class TestUserAdmin:
     def test_changelist(self, admin_client):
         url = reverse("admin:users_user_changelist")
