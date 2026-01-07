@@ -89,8 +89,8 @@ jobs:
         run: |
           docker compose -f docker-compose.local.yml up -d postgres
           echo "Waiting for PostgreSQL to start..."
-          sleep 10 
-          
+          sleep 10
+
           docker compose -f docker-compose.local.yml exec -T postgres psql -U debug -d pollution_backend -c 'CREATE TABLE IF NOT EXISTS "User" (id BIGSERIAL PRIMARY KEY, email VARCHAR(255) UNIQUE NOT NULL, password VARCHAR(128) NOT NULL, last_login TIMESTAMPTZ, is_superuser BOOLEAN DEFAULT FALSE, is_staff BOOLEAN DEFAULT FALSE, is_active BOOLEAN DEFAULT TRUE, date_joined TIMESTAMPTZ DEFAULT NOW());'
 
       - name: Check DB Migrations
