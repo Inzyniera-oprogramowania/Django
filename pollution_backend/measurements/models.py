@@ -8,4 +8,4 @@ class Measurement(models.Model):
     unit = models.CharField(max_length=15)
 
     class Meta:
-        db_table = 'measurement'
+        db_table = "measurement"

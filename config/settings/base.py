@@ -48,7 +48,7 @@ LOCALE_PATHS = [str(BASE_DIR / "locale")]
 # ------------------------------------------------------------------------------
 DATABASES = {
     "default": env.db("DATABASE_URL"),
-    "timeseries": env.db("TIMESCALE_URL"),
+    "timeseries": env.db("TIMESCALE_URL", default="postgres://postgres:postgres@localhost:5432/timeseries"),
 }
 
 DATABASES["default"]["ENGINE"] = "django.contrib.gis.db.backends.postgis"
