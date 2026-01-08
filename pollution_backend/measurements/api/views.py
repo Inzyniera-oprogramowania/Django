@@ -2,6 +2,7 @@ from rest_framework import mixins
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
 from pollution_backend.measurements.api.serializers import (
@@ -23,6 +24,7 @@ class MeasurementViewSet(
 ):
     queryset = Measurement.objects.none()
     serializer_class = MeasurementSerializer
+    permission_classes = [AllowAny]
 
     def get_queryset(self):
         if getattr(self, "swagger_fake_view", False):

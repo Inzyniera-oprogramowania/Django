@@ -1,5 +1,6 @@
 from django.shortcuts import get_object_or_404
 from rest_framework import viewsets
+from rest_framework.permissions import AllowAny
 
 from pollution_backend.selectors.sensors import get_active_sensors
 from pollution_backend.selectors.sensors import get_active_stations
@@ -19,6 +20,7 @@ from .serializers import SensorSerializer
 
 class MonitoringStationViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = MonitoringStation.objects.all()
+    permission_classes = [AllowAny]
 
     def get_queryset(self):
         return get_active_stations()
@@ -36,6 +38,7 @@ class MonitoringStationViewSet(viewsets.ReadOnlyModelViewSet):
 class SensorViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Sensor.objects.all()
     serializer_class = SensorSerializer
+    permission_classes = [AllowAny]
 
     def get_queryset(self):
         station_id = self.request.query_params.get("station_id")
@@ -46,6 +49,7 @@ class PollutantViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Pollutant.objects.all()
     serializer_class = PollutantSerializer
     pagination_class = None
+    permission_classes = [AllowAny]
 
     def get_queryset(self):
         return get_pollutants()
@@ -55,6 +59,7 @@ class QualityNormViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = QualityNorm.objects.all()
     serializer_class = QualityNormSerializer
     pagination_class = None
+    permission_classes = [AllowAny]
 
     def get_queryset(self):
         return get_norms()
