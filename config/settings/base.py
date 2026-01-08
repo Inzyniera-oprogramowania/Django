@@ -3,6 +3,7 @@
 
 import os
 import ssl
+from datetime import timedelta
 from pathlib import Path
 
 import environ
@@ -97,6 +98,8 @@ THIRD_PARTY_APPS = [
     "rest_framework.authtoken",
     "corsheaders",
     "drf_spectacular",
+    "dj_rest_auth",
+    "rest_framework_simplejwt",
 ]
 
 LOCAL_APPS = [
@@ -349,11 +352,9 @@ SOCIALACCOUNT_FORMS = {"signup": "pollution_backend.users.forms.UserSocialSignup
 # django-rest-framework - https://www.django-rest-framework.org/api-guide/settings/
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
-        "rest_framework.authentication.SessionAuthentication",
-        "rest_framework.authentication.TokenAuthentication",
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
     "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
-    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
 }
 
 # django-cors-headers - https://github.com/adamchainz/django-cors-headers#setup
@@ -375,3 +376,16 @@ if os.environ.get("USE_DOCKER") == "yes":
     GDAL_LIBRARY_PATH = "/usr/lib/x86_64-linux-gnu/libgdal.so"
 
 AUTH_USER_MODEL = "users.User"
+
+REST_SESSION_LOGIN = False
+
+REST_AUTH = {
+    "USE_JWT": True,
+    "JWT_AUTH_COOKIE": "djangojwtauth_cookie",
+    "JWT_AUTH_REFRESH_COOKIE": "djangojwtauth_refresh_cookie",
+}
+
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=15),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=3),
+}
