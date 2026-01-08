@@ -4,10 +4,7 @@ from rest_framework.routers import SimpleRouter
 
 from pollution_backend.measurements.api.views import MeasurementViewSet
 
-if settings.DEBUG:
-    router = DefaultRouter()
-else:
-    router = SimpleRouter()
+router = DefaultRouter() if settings.DEBUG else SimpleRouter()
 
 router.register("measurements", MeasurementViewSet, basename="measurement")
 

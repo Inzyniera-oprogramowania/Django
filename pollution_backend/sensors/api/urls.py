@@ -7,10 +7,7 @@ from pollution_backend.sensors.api.views import PollutantViewSet
 from pollution_backend.sensors.api.views import QualityNormViewSet
 from pollution_backend.sensors.api.views import SensorViewSet
 
-if settings.DEBUG:
-    router = DefaultRouter()
-else:
-    router = SimpleRouter()
+router = DefaultRouter() if settings.DEBUG else SimpleRouter()
 
 router.register("stations", MonitoringStationViewSet, basename="station")
 router.register("sensors", SensorViewSet, basename="sensor")

@@ -22,7 +22,7 @@ def get_pollutants() -> QuerySet[Pollutant]:
     return Pollutant.objects.all()
 
 
-def get_active_sensors(station_id: int = None) -> QuerySet[Sensor]:
+def get_active_sensors(station_id: int | None = None) -> QuerySet[Sensor]:
     queryset = Sensor.objects.filter(is_active=True).select_related(
         "pollutant",
         "monitoring_station",
