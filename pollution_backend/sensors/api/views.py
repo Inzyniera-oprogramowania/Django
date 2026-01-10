@@ -17,8 +17,14 @@ from .serializers import QualityNormSerializer
 from .serializers import SensorSerializer
 
 
+from drf_spectacular.utils import extend_schema
+
 class MonitoringStationViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = MonitoringStation.objects.all()
+
+    @extend_schema(exclude=True)
+    def list(self, request, *args, **kwargs):
+         return super().list(request, *args, **kwargs)
 
     def get_queryset(self):
         return get_active_stations()

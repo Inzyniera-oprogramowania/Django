@@ -355,6 +355,7 @@ REST_FRAMEWORK = {
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
     "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
 }
 
 # django-cors-headers - https://github.com/adamchainz/django-cors-headers#setup
@@ -366,7 +367,7 @@ SPECTACULAR_SETTINGS = {
     "TITLE": "Pollution IoT API",
     "DESCRIPTION": "Documentation of API endpoints of Pollution IoT",
     "VERSION": "1.0.0",
-    "SERVE_PERMISSIONS": ["rest_framework.permissions.IsAdminUser"],
+    "SERVE_PERMISSIONS": ["rest_framework.permissions.AllowAny"], # TODO: Remove this line in production
     "SCHEMA_PATH_PREFIX": "/api/",
 }
 # Your stuff...
@@ -374,6 +375,8 @@ SPECTACULAR_SETTINGS = {
 
 if os.environ.get("USE_DOCKER") == "yes":
     GDAL_LIBRARY_PATH = "/usr/lib/x86_64-linux-gnu/libgdal.so"
+    if not os.path.exists(GDAL_LIBRARY_PATH):
+        GDAL_LIBRARY_PATH = "/usr/lib/aarch64-linux-gnu/libgdal.so"
 
 AUTH_USER_MODEL = "users.User"
 

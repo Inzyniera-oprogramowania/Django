@@ -35,6 +35,7 @@ class MonitoringStationGeoSerializer(GeoFeatureModelSerializer):
         fields = ["id", "station_code", "owner", "is_active"]
 
 
+
 # Dokladny serializer monitoring station z sensorami i lokalizacja
 class MonitoringStationDetailSerializer(serializers.ModelSerializer):
     sensors = SensorSerializer(many=True, read_only=True, source="sensor_set")
