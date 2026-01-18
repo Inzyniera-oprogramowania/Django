@@ -4,30 +4,34 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .serializers import ForecastRequestSerializer, ForecastListSerializer, ForecastDetailSerializer
-from ..models import Forecast
-from ...services.aws_lambda import invoke_forecast_lambda, LambdaInvocationError
+from .serializers import (
+    ValidationRequestSerializer,
+    ValidationRunListSerializer,
+    ValidationRunDetailSerializer
+)
+from ..models import ModelValidationRun
+from ...services.aws_lambda import invoke_validation_lambda, LambdaInvocationError
 
 
-class TriggerForecastView(APIView):
+class TriggerValidationView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        serializer = ForecastRequestSerializer(data=request.data)
+        serializer = ValidationRequestSerializer(data=request.data)
 
         if serializer.is_valid():
             data = serializer.validated_data
 
             try:
-                invoke_forecast_lambda(
+                invoke_validation_lambda(
                     user_id=request.user.id,
-                    h3_index=data['h3_index'],
-                    pollutants=data['pollutants'],
-                    model_name=data.get('model_name')
+                    model_name=data.get('model_name'),
+                    run_name=data.get('run_name')
                 )
 
                 return Response(
-                    {"message": "Forecast generation started successfully."},
+                    {
+                        "message": "Validation run triggered successfully. Results will appear in the list once processed."},
                     status=status.HTTP_202_ACCEPTED
                 )
 
@@ -40,27 +44,29 @@ class TriggerForecastView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-class ForecastListView(generics.ListAPIView):
+class ValidationRunListView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
-    serializer_class = ForecastListSerializer
+    serializer_class = ValidationRunListSerializer
 
     def get_queryset(self):
-        return Forecast.objects.filter(
+        return ModelValidationRun.objects.filter(
             user=self.request.user
-        ).select_related('forecast_area').order_by('-created_at')
+        ).select_related('forecast_area').order_by('-executed_at')
 
 
-class ForecastDetailView(generics.RetrieveAPIView):
+class ValidationRunDetailView(generics.RetrieveAPIView):
     permission_classes = [IsAuthenticated]
-    serializer_class = ForecastDetailSerializer
+    serializer_class = ValidationRunDetailSerializer
     lookup_field = 'id'
 
     def get_queryset(self):
-        return Forecast.objects.filter(
+        return ModelValidationRun.objects.filter(
             user=self.request.user
         ).select_related(
             'forecast_area'
         ).prefetch_related(
-            'forecastpollutant_set',
-            'forecastpollutant_set__pollutant'
+            'metrics',
+            'metrics__pollutant',
+            'error_logs',
+            'error_logs__pollutant'
         )

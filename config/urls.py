@@ -27,6 +27,7 @@ urlpatterns = [
     path("api/", include("pollution_backend.sensors.api.urls")),
     path("api/", include("pollution_backend.measurements.api.urls")),
     path("api/forecast/", include("pollution_backend.forecasts.api.urls")),
+    path("api/model-validation/", include("pollution_backend.model_validation.api.urls")),
     path("auth/", include("dj_rest_auth.urls")),
     path("auth/registration/", include("dj_rest_auth.registration.urls")),
     # Media files
