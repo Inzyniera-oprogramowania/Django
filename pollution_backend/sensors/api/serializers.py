@@ -35,6 +35,16 @@ class MonitoringStationGeoSerializer(GeoFeatureModelSerializer):
         fields = ["id", "station_code", "owner", "is_active"]
 
 
+class MonitoringStationFlatSerializer(serializers.ModelSerializer):
+    lat = serializers.FloatField(source="location.geom.y", read_only=True)
+    lon = serializers.FloatField(source="location.geom.x", read_only=True)
+    address = serializers.CharField(source="location.full_address", read_only=True)
+
+    class Meta:
+        model = MonitoringStation
+        fields = ["id", "station_code", "owner", "is_active", "lat", "lon", "address"]
+
+
 
 # Dokladny serializer monitoring station z sensorami i lokalizacja
 class MonitoringStationDetailSerializer(serializers.ModelSerializer):

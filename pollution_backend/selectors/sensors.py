@@ -10,6 +10,10 @@ def get_active_stations() -> QuerySet[MonitoringStation]:
     return MonitoringStation.objects.filter(is_active=True).select_related("location")
 
 
+def get_all_stations() -> QuerySet[MonitoringStation]:
+    return MonitoringStation.objects.select_related("location").all()
+
+
 def get_station_detail(station_id: int) -> MonitoringStation:
     return (
         MonitoringStation.objects.select_related("location")
