@@ -111,6 +111,7 @@ LOCAL_APPS = [
     "pollution_backend.forecasts",
     "pollution_backend.reports",
     "pollution_backend.realtime",
+    "pollution_backend.model_validation",
     # Your stuff: custom apps go here
 ]
 # https://docs.djangoproject.com/en/dev/ref/settings/#installed-apps
@@ -372,7 +373,7 @@ SPECTACULAR_SETTINGS = {
     "TITLE": "Pollution IoT API",
     "DESCRIPTION": "Documentation of API endpoints of Pollution IoT",
     "VERSION": "1.0.0",
-    "SERVE_PERMISSIONS": ["rest_framework.permissions.AllowAny"], # TODO: Remove this line in production
+    "SERVE_PERMISSIONS": ["rest_framework.permissions.AllowAny"],  # TODO: Remove this line in production
     "SCHEMA_PATH_PREFIX": "/api/",
 }
 # Your stuff...
@@ -398,3 +399,10 @@ SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=15),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=3),
 }
+
+# AWS
+AWS_ACCESS_KEY_ID = env('AWS_ACCESS_KEY_ID')
+AWS_SECRET_ACCESS_KEY = env('AWS_SECRET_ACCESS_KEY')
+AWS_REGION_NAME = env('AWS_REGION_NAME', default='eu-west-1')
+FORECAST_LAMBDA_FUNCTION_NAME = env('FORECAST_LAMBDA_FUNCTION_NAME')
+VALIDATION_LAMBDA_FUNCTION_NAME = env('VALIDATION_LAMBDA_FUNCTION_NAME')
