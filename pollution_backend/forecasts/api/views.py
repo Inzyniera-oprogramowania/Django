@@ -4,9 +4,19 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .serializers import ForecastRequestSerializer, ForecastListSerializer, ForecastDetailSerializer
-from ..models import Forecast
+from .serializers import ForecastRequestSerializer, ForecastListSerializer, ForecastDetailSerializer, ForecastAreaSerializer
+from ..models import Forecast, ForecastArea
 from ...services.aws_lambda import invoke_forecast_lambda, LambdaInvocationError
+
+
+class ForecastAreaListView(generics.ListAPIView):
+    """List all forecast areas for selection."""
+    permission_classes = [IsAuthenticated]
+    serializer_class = ForecastAreaSerializer
+    pagination_class = None
+
+    def get_queryset(self):
+        return ForecastArea.objects.all().order_by('name')
 
 
 class TriggerForecastView(APIView):
