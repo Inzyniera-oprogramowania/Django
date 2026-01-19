@@ -5,6 +5,11 @@ import io
 import hashlib
 import csv
 from xml.etree.ElementTree import Element, SubElement, tostring
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import A4
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph
+from reportlab.lib.styles import getSampleStyleSheet
+
 
 class ExportService:
     def __init__(self, validate_data):
@@ -75,7 +80,10 @@ class ExportService:
         else:
             raise ValueError("Unsupported file format")
         
-        checksum = hashlib.sha256(content.encode('utf-8')).hexdigest()
+        if isinstance(content, str):
+            checksum = hashlib.sha256(content.encode('utf-8')).hexdigest()
+        else:
+            checksum = hashlib.sha256(content).hexdigest()
         date_from_str = self.data['date_from'].strftime('%Y-%m-%d')
         date_to_str = self.data['date_to'].strftime('%Y-%m-%d')
         
@@ -110,5 +118,36 @@ class ExportService:
         return content, content_type
 
     def _generate_pdf(self, measurements):
-        pass
+        buffer = io.BytesIO()
 
+        doc = SimpleDocTemplate(buffer, pagesize=A4)
+        elements = []
+        styles = getSampleStyleSheet()
+        title = f"Measurement Export from {self.data['date_from']} to {self.data['date_to']}"
+        elements.append(Paragraph(title, styles['Title']))
+        elements.append(Paragraph("<br/><br/>", styles['Normal']))
+
+        data = [['Time', 'Value', 'Unit', 'Station', 'Pollutant']] 
+
+        for m in measurements:
+            data.append([m['time'], str(m['value']), m['unit'], m['station'], m['pollutant']])
+
+        table = Table(data)
+        table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),       
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),  
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),              
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),    
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),             
+            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),     
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),        
+        ]))
+
+        elements.append(table)
+
+        doc.build(elements)
+
+        pdf_value = buffer.getvalue()
+        buffer.close()
+
+        return pdf_value.decode('latin1'), "application/pdf"

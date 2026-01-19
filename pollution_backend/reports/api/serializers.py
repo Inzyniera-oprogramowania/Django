@@ -5,7 +5,7 @@ class DataExportRequestSerializer(serializers.Serializer):
         ('csv', 'CSV'),
         ('json', 'JSON'),
         ('xml', 'XML'),
-        # ('pdf', 'PDF'),
+        ('pdf', 'PDF'),
         ]
     
     date_from = serializers.DateField(required=True)

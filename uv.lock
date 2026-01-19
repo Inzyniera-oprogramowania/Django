@@ -1480,6 +1480,7 @@ dependencies = [
     { name = "psycopg", extra = ["c"] },
     { name = "python-slugify" },
     { name = "redis" },
+    { name = "reportlab" },
     { name = "sentry-sdk" },
     { name = "uvicorn", extra = ["standard"] },
     { name = "uvicorn-worker" },
@@ -1540,6 +1541,7 @@ requires-dist = [
     { name = "psycopg", extras = ["c"], specifier = "==3.3.1" },
     { name = "python-slugify", specifier = "==8.0.4" },
     { name = "redis", specifier = "==7.1.0" },
+    { name = "reportlab", specifier = ">=4.4.9" },
     { name = "sentry-sdk", specifier = "==2.47.0" },
     { name = "uvicorn", extras = ["standard"], specifier = "==0.38.0" },
     { name = "uvicorn-worker", specifier = "==0.4.0" },
@@ -1891,6 +1893,19 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/4f/f9/8bd6b656592f925b6845fcbb4d57603a3ac2fb2373344ffa1ed70aa6820a/regex-2025.11.3-cp313-cp313t-win32.whl", hash = "sha256:9ddc42e68114e161e51e272f667d640f97e84a2b9ef14b7477c53aac20c2d59a", size = 268792, upload-time = "2025-11-03T21:32:44.13Z" },
     { url = "https://files.pythonhosted.org/packages/e5/87/0e7d603467775ff65cd2aeabf1b5b50cc1c3708556a8b849a2fa4dd1542b/regex-2025.11.3-cp313-cp313t-win_amd64.whl", hash = "sha256:7a7c7fdf755032ffdd72c77e3d8096bdcb0eb92e89e17571a196f03d88b11b3c", size = 280214, upload-time = "2025-11-03T21:32:45.853Z" },
     { url = "https://files.pythonhosted.org/packages/8d/d0/2afc6f8e94e2b64bfb738a7c2b6387ac1699f09f032d363ed9447fd2bb57/regex-2025.11.3-cp313-cp313t-win_arm64.whl", hash = "sha256:df9eb838c44f570283712e7cff14c16329a9f0fb19ca492d21d4b7528ee6821e", size = 271469, upload-time = "2025-11-03T21:32:48.026Z" },
+]
+
+[[package]]
+name = "reportlab"
+version = "4.4.9"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "charset-normalizer" },
+    { name = "pillow" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/1a/39/42cf24aee570a80e1903221ae3a92a2e34c324794a392eb036cbb6dc3839/reportlab-4.4.9.tar.gz", hash = "sha256:7cf487764294ee791a4781f5a157bebce262a666ae4bbb87786760a9676c9378", size = 3911246, upload-time = "2026-01-15T10:07:56.08Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/17/77/546e50edfaba6a0e58e8ec5fdc4446510227cec9e8f40172b60941d5a633/reportlab-4.4.9-py3-none-any.whl", hash = "sha256:68e2d103ae8041a37714e8896ec9b79a1c1e911d68c3bd2ea17546568cf17bfd", size = 1954401, upload-time = "2026-01-15T09:27:59.133Z" },
 ]
 
 [[package]]
