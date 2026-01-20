@@ -1,6 +1,12 @@
 from rest_framework import serializers
 
-from pollution_backend.forecasts.models import Forecast, ForecastPollutant
+from pollution_backend.forecasts.models import Forecast, ForecastPollutant, ForecastArea
+
+
+class ForecastAreaSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ForecastArea
+        fields = ['id', 'name', 'h3_cells']
 
 
 class ForecastRequestSerializer(serializers.Serializer):

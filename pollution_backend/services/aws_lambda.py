@@ -47,7 +47,7 @@ def invoke_forecast_lambda(user_id, h3_index, pollutants, model_name=None):
 def invoke_validation_lambda(user_id, model_name=None, run_name=None):
     payload_data = {
         "user_id": user_id,
-        "model_name": model_name,
+        #"model_name": model_name,
         "run_name": run_name
     }
 
