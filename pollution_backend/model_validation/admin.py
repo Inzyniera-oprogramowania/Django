@@ -22,9 +22,9 @@ class ValidationErrorLogInline(admin.TabularInline):
 class ModelValidationRunAdmin(admin.ModelAdmin):
     list_display = ("name", "model_name", "executed_at", "user", "data_start_time", "id")
     list_filter = ("model_name", "executed_at", "user")
-    search_fields = ("name", "user__username", "user__email", "forecast_area__name")
+    search_fields = ("name", "user__username", "user__email")
     inlines = [ValidationMetricInline, ValidationErrorLogInline]
-    raw_id_fields = ("user", "forecast_area")
+    raw_id_fields = ("user",)
     date_hierarchy = "executed_at"
 
 

@@ -10,7 +10,6 @@ from ...services.aws_lambda import invoke_forecast_lambda, LambdaInvocationError
 
 
 class ForecastAreaListView(generics.ListAPIView):
-    """List all forecast areas for selection."""
     permission_classes = [IsAuthenticated]
     serializer_class = ForecastAreaSerializer
     pagination_class = None
