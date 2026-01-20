@@ -51,7 +51,7 @@ class ValidationRunListView(generics.ListAPIView):
     def get_queryset(self):
         return ModelValidationRun.objects.filter(
             user=self.request.user
-        ).select_related('forecast_area').order_by('-executed_at')
+        ).order_by('-executed_at')
 
 
 class ValidationRunDetailView(generics.RetrieveAPIView):
@@ -62,8 +62,6 @@ class ValidationRunDetailView(generics.RetrieveAPIView):
     def get_queryset(self):
         return ModelValidationRun.objects.filter(
             user=self.request.user
-        ).select_related(
-            'forecast_area'
         ).prefetch_related(
             'metrics',
             'metrics__pollutant',

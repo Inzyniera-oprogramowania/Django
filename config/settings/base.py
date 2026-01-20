@@ -332,8 +332,7 @@ CELERY_WORKER_HIJACK_ROOT_LOGGER = False
 # ------------------------------------------------------------------------------
 ACCOUNT_ALLOW_REGISTRATION = env.bool("DJANGO_ACCOUNT_ALLOW_REGISTRATION", True)
 # https://docs.allauth.org/en/latest/account/configuration.html
-ACCOUNT_AUTHENTICATION_METHOD = "email"
-ACCOUNT_USERNAME_REQUIRED = False
+ACCOUNT_LOGIN_METHODS = {"email"}
 # https://docs.allauth.org/en/latest/account/configuration.html
 ACCOUNT_SIGNUP_FIELDS = ["email", "password1", "password2"]
 # https://docs.allauth.org/en/latest/account/configuration.html
@@ -405,3 +404,10 @@ AWS_SECRET_ACCESS_KEY = env('AWS_SECRET_ACCESS_KEY')
 AWS_REGION_NAME = env('AWS_REGION_NAME', default='eu-west-1')
 FORECAST_LAMBDA_FUNCTION_NAME = env('FORECAST_LAMBDA_FUNCTION_NAME')
 VALIDATION_LAMBDA_FUNCTION_NAME = env('VALIDATION_LAMBDA_FUNCTION_NAME')
+
+# MQTT
+# ------------------------------------------------------------------------------
+MQTT_BROKER_HOST = env("MQTT_BROKER_HOST", default="mosquitto")
+MQTT_BROKER_PORT = env.int("MQTT_BROKER_PORT", default=1883)
+MQTT_TOPICS = env.list("MQTT_TOPICS", default=["sensors/#"])
+

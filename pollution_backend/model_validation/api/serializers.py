@@ -9,7 +9,7 @@ class ValidationRequestSerializer(serializers.Serializer):
 
 
 class ValidationRunListSerializer(serializers.ModelSerializer):
-    area_name = serializers.CharField(source='forecast_area.name', read_only=True)
+
 
     class Meta:
         model = ModelValidationRun
@@ -18,7 +18,7 @@ class ValidationRunListSerializer(serializers.ModelSerializer):
             'name',
             'model_name',
             'executed_at',
-            'area_name',
+
             'data_start_time',
             'data_end_time'
         ]
@@ -53,7 +53,7 @@ class ValidationErrorLogSerializer(serializers.ModelSerializer):
 
 
 class ValidationRunDetailSerializer(serializers.ModelSerializer):
-    area_name = serializers.CharField(source='forecast_area.name', read_only=True)
+
     metrics = ValidationMetricSerializer(many=True, read_only=True)
     error_logs = ValidationErrorLogSerializer(many=True, read_only=True)
 
@@ -64,7 +64,7 @@ class ValidationRunDetailSerializer(serializers.ModelSerializer):
             'name',
             'model_name',
             'executed_at',
-            'area_name',
+
             'data_start_time',
             'data_end_time',
             'metrics',

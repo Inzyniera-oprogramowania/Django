@@ -1,8 +1,9 @@
-
 volumes:
   pollution_backend_local_postgres_data: {}
   pollution_backend_local_postgres_data_backups: {}
   pollution_backend_local_redis_data: {}
+  pollution_backend_local_mosquitto_data: {}
+  pollution_backend_local_mosquitto_log: {}
 
 services:
   django: &django
@@ -71,3 +72,14 @@ services:
     ports:
       - '5555:5555'
     command: /start-flower
+
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: pollution_backend_local_mosquitto
+    volumes:
+      - ./compose/local/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - pollution_backend_local_mosquitto_data:/mosquitto/data
+      - pollution_backend_local_mosquitto_log:/mosquitto/log
+    ports:
+      - '1883:1883'
+      - '9001:9001'
