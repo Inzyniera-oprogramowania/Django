@@ -16,7 +16,7 @@ Requirements:
     pip install paho-mqtt
 """
 
-# TODO wszystko pobierane z bazy i cron
+# TODO wszystko pobierane z bazy i cron, dodanie logów systemowych, zuzycia baterii, sygnał, uptime, reset?
 
 import argparse
 import json

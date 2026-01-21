@@ -128,6 +128,8 @@ class AnomalyLog(models.Model):
         return f"Anomaly: {self.description[:30]}..."
 
 
+
+
 class AnomalyRule(models.Model):
     """
     Per-pollutant anomaly detection rules.

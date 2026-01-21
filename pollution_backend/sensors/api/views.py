@@ -1,4 +1,5 @@
 import requests
+import time
 from django.shortcuts import get_object_or_404
 from rest_framework import viewsets
 from rest_framework.pagination import PageNumberPagination
@@ -96,32 +97,48 @@ class MonitoringStationViewSet(viewsets.ModelViewSet):
         return MonitoringStationDetailSerializer
 
     @action(detail=False, methods=["post"], url_path="validate_address")
-    # TODO: fix
     def validate_address(self, request):
         address = request.data.get("address")
         if not address:
             return Response({"valid": False, "error": "Adres jest wymagany"}, status=400)
             
+        import re
+        
         geocode_url = "https://nominatim.openstreetmap.org/search"
-        try:
-            resp = requests.get(geocode_url, params={
-                "q": address,
-                "format": "json",
-                "limit": 1
-            }, headers={"User-Agent": "PollutionMonitoringApp/1.0"}, timeout=5)
-            
-            if resp.status_code == 200 and resp.json():
-                result = resp.json()[0]
-                return Response({
-                    "valid": True,
-                    "lat": float(result["lat"]),
-                    "lon": float(result["lon"]),
-                    "display_name": result.get("display_name")
-                })
-            else:
-                 return Response({"valid": False})
-        except Exception as e:
-            return Response({"valid": False, "error": str(e)})
+        
+        def clean_addr(a):
+            val = re.sub(r'^(ul\.|al\.|os\.|pl\.)\s*', '', a, flags=re.IGNORECASE)
+            val = re.sub(r'/\d+[a-zA-Z]*', '', val)
+            return val.strip()
+
+        attempts = sorted(list(set([address, clean_addr(address)])), key=len, reverse=True)
+        
+        last_error = None
+        for attempt in attempts:
+            try:
+                # todo change later
+                ua = f"PollutionApp_DEV_{int(time.time())}"
+                resp = requests.get(geocode_url, params={
+                    "q": attempt,
+                    "format": "json",
+                    "limit": 1
+                }, headers={"User-Agent": ua}, timeout=10)
+                
+                if resp.status_code == 200 and resp.json():
+                    result = resp.json()[0]
+                    return Response({
+                        "valid": True,
+                        "lat": float(result["lat"]),
+                        "lon": float(result["lon"]),
+                        "display_name": result.get("display_name")
+                    })
+                elif resp.status_code != 200:
+                    last_error = f"Nominatim Error: {resp.status_code}"
+            except Exception as e:
+                last_error = str(e)
+                continue
+                
+        return Response({"valid": False, "debug_error": last_error})
 
     def create(self, request, *args, **kwargs):
         from .serializers import StationCreateSerializer
@@ -308,7 +325,8 @@ class DeviceViewSet(viewsets.ViewSet):
                 last_time_str = max_time.strftime("%Y-%m-%d %H:%M") if max_time else "-"
                 
                 devices.append({
-                    "id": s.station_code,
+                    "id": s.id,
+                    "station_code": s.station_code,
                     "type": "Stacja",
                     "pollutants": sorted(list(station_pollutants)),
                     "address": s.location.full_address if s.location else "Brak danych",
@@ -333,7 +351,8 @@ class DeviceViewSet(viewsets.ViewSet):
                 last_time = sensor_last_times.get(s.id)
                 last_time_str = last_time.strftime("%Y-%m-%d %H:%M") if last_time else "-"
                 devices.append({
-                    "id": s.serial_number,
+                    "id": s.id,
+                    "serial_number": s.serial_number,
                     "type": "Czujnik",
                     "pollutants": [s.pollutant.symbol] if s.pollutant else [],
                     "address": s.monitoring_station.station_code if s.monitoring_station else "Brak danych",

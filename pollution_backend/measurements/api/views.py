@@ -76,3 +76,27 @@ class MeasurementViewSet(
 
         serializer = AggregatedMeasurementSerializer(data, many=True)
         return Response(serializer.data)
+
+
+class SystemLogViewSet(viewsets.ModelViewSet):
+    from pollution_backend.measurements.models import SystemLog
+    from pollution_backend.measurements.api.serializers import SystemLogSerializer
+    
+    queryset = SystemLog.objects.all()
+    serializer_class = SystemLogSerializer
+    pagination_class = None
+    
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        
+        # Filter by device
+        sensor_id = self.request.query_params.get('sensor_id')
+        station_id = self.request.query_params.get('station_id')
+        
+        if sensor_id:
+            queryset = queryset.filter(sensor_id=sensor_id)
+        if station_id:
+            queryset = queryset.filter(station_id=station_id)
+            
+        return queryset
+

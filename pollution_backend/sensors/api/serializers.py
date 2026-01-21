@@ -100,7 +100,9 @@ class AnomalyLogSerializer(serializers.ModelSerializer):
 
 
 class DeviceSerializer(serializers.Serializer):
-    id = serializers.CharField()
+    id = serializers.IntegerField()
+    station_code = serializers.CharField(required=False)
+    serial_number = serializers.CharField(required=False)
     type = serializers.CharField()
     pollutants = serializers.ListField(child=serializers.CharField(), required=False)
     address = serializers.CharField()
@@ -123,15 +125,21 @@ class SensorCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Sensor
         fields = [
-            'serial_number', 'sensor_type', 'manufacturer', 'model',
+            'id', 'serial_number', 'sensor_type', 'manufacturer', 'model',
             'monitoring_station', 'pollutant', 'calibration_date',
-            'measurement_range_max', 'send_interval_seconds'
+            'measurement_range_max', 'send_interval_seconds', 'is_active'
         ]
     
     def validate_serial_number(self, value):
         if value and Sensor.objects.filter(serial_number=value).exists():
             raise serializers.ValidationError("Czujnik o tym numerze seryjnym już istnieje.")
         return value
+
+    def create(self, validated_data):
+        from django.utils import timezone
+        if not validated_data.get('calibration_date'):
+            validated_data['calibration_date'] = timezone.now().date()
+        return super().create(validated_data)
 
 
         fields = [
