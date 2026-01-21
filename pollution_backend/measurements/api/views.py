@@ -1,7 +1,10 @@
+from datetime import datetime
+
 from rest_framework import mixins
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 
 from pollution_backend.measurements.api.serializers import (
@@ -15,6 +18,12 @@ from pollution_backend.selectors.measurements import get_measurements_for_sensor
 SENSOR_ID_REQUIRED = "sensor_id query parameter is required."
 
 
+class MeasurementPagination(PageNumberPagination):
+    page_size = 100
+    page_size_query_param = "page_size"
+    max_page_size = 1000
+
+
 class MeasurementViewSet(
     mixins.CreateModelMixin,
     mixins.RetrieveModelMixin,
@@ -23,6 +32,7 @@ class MeasurementViewSet(
 ):
     queryset = Measurement.objects.none()
     serializer_class = MeasurementSerializer
+    pagination_class = MeasurementPagination
 
     def get_queryset(self):
         if getattr(self, "swagger_fake_view", False):
@@ -32,7 +42,22 @@ class MeasurementViewSet(
         if not sensor_id:
             return Measurement.objects.none()
 
-        return get_measurements_for_sensor(sensor_id=int(sensor_id))
+        date_from = self._parse_date(self.request.query_params.get("date_from"))
+        date_to = self._parse_date(self.request.query_params.get("date_to"))
+
+        return get_measurements_for_sensor(
+            sensor_id=int(sensor_id),
+            date_from=date_from,
+            date_to=date_to,
+        )
+
+    def _parse_date(self, date_str: str | None) -> datetime | None:
+        if not date_str:
+            return None
+        try:
+            return datetime.fromisoformat(date_str.replace("Z", "+00:00"))
+        except ValueError:
+            return None
 
     @action(detail=False, methods=["get"])
     def aggregated(self, request):

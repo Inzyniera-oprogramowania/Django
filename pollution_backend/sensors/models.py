@@ -61,6 +61,8 @@ class Sensor(models.Model):
     serial_number = models.CharField(unique=True, max_length=100, blank=True, null=True)
     calibration_date = models.DateField(blank=True, null=True)
     is_active = models.BooleanField(default=True)
+    measurement_range_max = models.FloatField(blank=True, null=True)
+    send_interval_seconds = models.IntegerField(blank=True, null=True)
     monitoring_station = models.ForeignKey(
         MonitoringStation,
         on_delete=models.CASCADE,
@@ -78,6 +80,7 @@ class Sensor(models.Model):
 
     def __str__(self):
         return f"{self.sensor_type} ({self.serial_number or 'No Serial'})"
+
 
 
 class QualityNorm(models.Model):
