@@ -3,18 +3,27 @@ from django.shortcuts import get_object_or_404
 from rest_framework import viewsets
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
+from rest_framework.permissions import AllowAny, IsAuthenticated
 
+from rest_framework.filters import OrderingFilter
+from django_filters import rest_framework as filters
 from rest_framework.decorators import action
 from pollution_backend.selectors.sensors import get_active_sensors
 from pollution_backend.selectors.sensors import get_active_stations
 from pollution_backend.selectors.sensors import get_all_stations
 from pollution_backend.selectors.sensors import get_norms
 from pollution_backend.selectors.sensors import get_pollutants
+from pollution_backend.sensors.models import AnomalyLog
+from pollution_backend.sensors.models import AnomalyRule
+from pollution_backend.sensors.models import GlobalAnomalyConfig
 from pollution_backend.sensors.models import MonitoringStation
 from pollution_backend.sensors.models import Pollutant
 from pollution_backend.sensors.models import QualityNorm
 from pollution_backend.sensors.models import Sensor
 
+from .serializers import AnomalyLogSerializer
+from .serializers import AnomalyRuleSerializer
+from .serializers import GlobalAnomalyConfigSerializer
 from .serializers import MonitoringStationDetailSerializer
 from .serializers import MonitoringStationFlatSerializer
 from .serializers import MonitoringStationGeoSerializer
@@ -356,4 +365,101 @@ class DeviceViewSet(viewsets.ViewSet):
             "previous": None if page <= 1 else f"?page={page - 1}",
             "results": serializer.data,
         })
+class AnomalyLogFilter(filters.FilterSet):
+    """Filter for AnomalyLog queryset."""
+
+    status = filters.CharFilter(field_name="status", lookup_expr="iexact")
+    sensor_id = filters.NumberFilter(field_name="sensor_id")
+    detected_at_after = filters.DateTimeFilter(
+        field_name="detected_at", lookup_expr="gte"
+    )
+    detected_at_before = filters.DateTimeFilter(
+        field_name="detected_at", lookup_expr="lte"
+    )
+
+    class Meta:
+        model = AnomalyLog
+        fields = ["status", "sensor_id", "detected_at_after", "detected_at_before"]
+
+
+class AnomalyLogViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for AnomalyLog model.
+
+    Supports:
+    - GET /api/anomalies/ - list with filtering
+    - GET /api/anomalies/{id}/ - single anomaly details
+    - PATCH /api/anomalies/{id}/ - update status
+    """
+
+    queryset = AnomalyLog.objects.all()
+    serializer_class = AnomalyLogSerializer
+    filterset_class = AnomalyLogFilter
+    filter_backends = [filters.DjangoFilterBackend, OrderingFilter]
+    ordering_fields = ["detected_at", "status", "sensor__id"]
+    ordering = ["-detected_at"]
+    http_method_names = ["get", "patch", "head", "options"]
+
+    def get_permissions(self):
+        if self.action in ["list", "retrieve"]:
+            return [AllowAny()]
+        return [IsAuthenticated()]
+
+    def get_queryset(self):
+        return AnomalyLog.objects.select_related(
+            "sensor",
+            "sensor__monitoring_station",
+            "sensor__pollutant",
+        )
+
+
+class AnomalyRuleViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for AnomalyRule model.
+
+    Supports:
+    - GET /api/anomaly-rules/ - list all rules
+    - GET /api/anomaly-rules/{id}/ - single rule details
+    - PUT/PATCH /api/anomaly-rules/{id}/ - update rule
+    """
+
+    queryset = AnomalyRule.objects.all()
+    serializer_class = AnomalyRuleSerializer
+    pagination_class = None
+    http_method_names = ["get", "put", "patch", "head", "options"]
+
+    def get_permissions(self):
+        if self.action in ["list", "retrieve"]:
+            return [AllowAny()]
+        return [IsAuthenticated()]
+
+    def get_queryset(self):
+        return AnomalyRule.objects.select_related("pollutant").order_by("pollutant__symbol")
+
+
+class GlobalAnomalyConfigViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for GlobalAnomalyConfig (singleton).
+
+    Supports:
+    - GET /api/anomaly-config/ - get global config
+    - PUT/PATCH /api/anomaly-config/1/ - update global config
+    """
+
+    queryset = GlobalAnomalyConfig.objects.all()
+    serializer_class = GlobalAnomalyConfigSerializer
+    pagination_class = None
+    http_method_names = ["get", "put", "patch", "head", "options"]
+
+    def get_permissions(self):
+        if self.action in ["list", "retrieve"]:
+            return [AllowAny()]
+        return [IsAuthenticated()]
+
+    def get_queryset(self):
+        # Ensure singleton exists
+        GlobalAnomalyConfig.get_config()
+        return GlobalAnomalyConfig.objects.all()
+
+
 

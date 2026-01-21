@@ -2,6 +2,8 @@ from rest_framework import serializers
 from rest_framework_gis.serializers import GeoFeatureModelSerializer
 
 from pollution_backend.sensors.models import AnomalyLog
+from pollution_backend.sensors.models import AnomalyRule
+from pollution_backend.sensors.models import GlobalAnomalyConfig
 from pollution_backend.sensors.models import Location
 from pollution_backend.sensors.models import MonitoringStation
 from pollution_backend.sensors.models import Pollutant
@@ -79,6 +81,19 @@ class QualityNormSerializer(serializers.ModelSerializer):
 
 
 class AnomalyLogSerializer(serializers.ModelSerializer):
+    station_code = serializers.CharField(
+        source="sensor.monitoring_station.station_code", read_only=True
+    )
+    pollutant_symbol = serializers.CharField(
+        source="sensor.pollutant.symbol", read_only=True
+    )
+    pollutant_name = serializers.CharField(
+        source="sensor.pollutant.name", read_only=True
+    )
+    sensor_serial_number = serializers.CharField(
+        source="sensor.serial_number", read_only=True
+    )
+
     class Meta:
         model = AnomalyLog
         fields = "__all__"
@@ -118,4 +133,46 @@ class SensorCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Czujnik o tym numerze seryjnym już istnieje.")
         return value
 
+
+        fields = [
+            "id",
+            "description",
+            "detected_at",
+            "status",
+            "severity",
+            "sensor",
+            "station_code",
+            "pollutant_symbol",
+            "pollutant_name",
+            "sensor_serial_number",
+        ]
+        read_only_fields = ["id", "description", "detected_at", "sensor", "severity"]
+
+
+class AnomalyRuleSerializer(serializers.ModelSerializer):
+    pollutant_symbol = serializers.CharField(source="pollutant.symbol", read_only=True)
+    pollutant_name = serializers.CharField(source="pollutant.name", read_only=True)
+
+    class Meta:
+        model = AnomalyRule
+        fields = [
+            "id",
+            "pollutant",
+            "pollutant_symbol",
+            "pollutant_name",
+            "is_enabled",
+            "warning_threshold",
+            "critical_threshold",
+            "sudden_change_enabled",
+            "sudden_change_percent",
+            "sudden_change_minutes",
+        ]
+        read_only_fields = ["id", "pollutant", "pollutant_symbol", "pollutant_name"]
+
+
+class GlobalAnomalyConfigSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = GlobalAnomalyConfig
+        fields = ["id", "missing_data_timeout_minutes"]
+        read_only_fields = ["id"]
 

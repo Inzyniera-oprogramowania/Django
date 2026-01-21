@@ -13,11 +13,7 @@ class ModelValidationRun(models.Model):
     data_start_time = models.DateTimeField()
     data_end_time = models.DateTimeField()
 
-    forecast_area = models.ForeignKey(
-        'forecasts.ForecastArea',
-        on_delete=models.CASCADE,
-        db_column='forecastareaid'
-    )
+
 
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
