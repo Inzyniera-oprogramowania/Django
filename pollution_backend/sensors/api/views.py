@@ -33,7 +33,49 @@ from .serializers import QualityNormSerializer
 from .serializers import SensorSerializer
 
 
+
 from drf_spectacular.utils import extend_schema
+from django.core.cache import cache
+import hashlib
+import json
+
+
+def get_device_list_cache_key(params_dict):
+    cache_key_base = json.dumps(params_dict, sort_keys=True)
+    cache_key_hash = hashlib.md5(cache_key_base.encode()).hexdigest()
+    return f"devices:list:{cache_key_hash}"
+
+
+def invalidate_device_list_cache():
+    cache_version_key = "devices:list:version"
+    current_version = cache.get(cache_version_key, 0)
+    cache.set(cache_version_key, current_version + 1, timeout=None)
+
+
+def broadcast_station_log(station_id, log):
+    try:
+        from asgiref.sync import async_to_sync
+        from channels.layers import get_channel_layer
+        
+        channel_layer = get_channel_layer()
+        if channel_layer:
+            async_to_sync(channel_layer.group_send)(
+                f"station_{station_id}_status",
+                {
+                    "type": "system_log",
+                    "data": {
+                        "msg_type": "log",
+                        "id": log.id,
+                        "station_id": station_id,
+                        "event_type": log.event_type,
+                        "message": log.message,
+                        "log_level": log.log_level,
+                        "timestamp": log.timestamp.isoformat()
+                    }
+                }
+            )
+    except Exception as e:
+        print(f"Failed to broadcast station log: {e}")
 
 
 class DevicePagination(PageNumberPagination):
@@ -193,6 +235,14 @@ class MonitoringStationViewSet(viewsets.ModelViewSet):
             "lon": lon
         }, status=201)
 
+    def perform_update(self, serializer):
+        super().perform_update(serializer)
+        invalidate_device_list_cache()
+
+    def perform_destroy(self, instance):
+        super().perform_destroy(instance)
+        invalidate_device_list_cache()
+
 
 class SensorViewSet(viewsets.ModelViewSet):
     queryset = Sensor.objects.all()
@@ -237,6 +287,134 @@ class SensorViewSet(viewsets.ModelViewSet):
         
         return queryset
 
+    @action(detail=True, methods=["post"], url_path="reset")
+    def reset(self, request, pk=None):
+        from asgiref.sync import async_to_sync
+        from channels.layers import get_channel_layer
+        from django.utils import timezone
+
+        from pollution_backend.sensors.models import DeviceStatus
+
+        sensor = self.get_object()
+        status, _ = DeviceStatus.objects.get_or_create(sensor=sensor)
+        status.uptime_seconds = 0
+        status.last_reset_at = timezone.now()
+        status.save()
+
+        channel_layer = get_channel_layer()
+        if channel_layer:
+            async_to_sync(channel_layer.group_send)(
+                f"sensor_{pk}_status",
+                {
+                    "type": "status_update",
+                    "data": {
+                        "sensor_id": int(pk),
+                        "uptime_seconds": 0,
+                        "last_reset_at": status.last_reset_at.isoformat(),
+                        "reset": True,
+                        "battery_percent": 100,
+                    },
+                },
+            )
+
+        try:
+            from pollution_backend.measurements.models import SystemLog
+            SystemLog.objects.create(
+                event_type="DEVICE_RESET",
+                message=f"Device reset triggered for Sensor {sensor.id}",
+                log_level=SystemLog.WARNING,
+                sensor_id=sensor.id,
+            )
+        except Exception as e:
+            print(f"Failed to create SystemLog for reset: {e}")
+
+        try:
+            import paho.mqtt.publish as publish
+            from django.conf import settings
+            
+            broker_host = getattr(settings, "MQTT_BROKER_HOST", "mosquitto")
+            station_code = sensor.monitoring_station.station_code
+            topic = f"sensors/{station_code}/command"
+            
+            payload = '{"command": "RESET"}'
+            publish.single(topic, payload, hostname=broker_host)
+        except Exception as e:
+             print(f"Failed to publish MQTT reset command: {e}")
+
+        return Response({"status": "reset", "last_reset_at": status.last_reset_at.isoformat()})
+
+    def perform_create(self, serializer):
+        sensor = serializer.save()
+        invalidate_device_list_cache()
+        
+        try:
+            from pollution_backend.measurements.models import SystemLog
+            
+            station = sensor.monitoring_station
+            pollutant_name = sensor.pollutant.symbol if sensor.pollutant else "Unknown"
+            
+            log = SystemLog.objects.create(
+                station_id=station.id,
+                event_type="SENSOR_ADDED",
+                message=f"Sensor {pollutant_name} (SN: {sensor.serial_number}) added to station",
+                log_level=SystemLog.INFO
+            )
+            broadcast_station_log(station.id, log)
+        except Exception as e:
+            print(f"Failed to create station log: {e}")
+
+    def perform_update(self, serializer):
+        sensor = serializer.save()
+        invalidate_device_list_cache()
+        
+        try:
+            from pollution_backend.measurements.models import SystemLog
+            station = sensor.monitoring_station
+            pollutant_name = sensor.pollutant.symbol if sensor.pollutant else "Unknown"
+            
+            if 'is_active' in serializer.validated_data:
+                if sensor.is_active:
+                    message = f"Sensor {pollutant_name} (SN: {sensor.serial_number}) activated"
+                    level = SystemLog.SUCCESS
+                else:
+                    message = f"Sensor {pollutant_name} (SN: {sensor.serial_number}) deactivated"
+                    level = SystemLog.WARNING
+            else:
+                message = f"Sensor {pollutant_name} (SN: {sensor.serial_number}) configuration updated"
+                level = SystemLog.INFO
+            
+            log = SystemLog.objects.create(
+                station_id=station.id,
+                event_type="SENSOR_UPDATED",
+                message=message,
+                log_level=level
+            )
+            broadcast_station_log(station.id, log)
+        except Exception as e:
+            print(f"Failed to create station log: {e}")
+
+    def perform_destroy(self, instance):
+        station = instance.monitoring_station
+        station_id = station.id
+        pollutant_name = instance.pollutant.symbol if instance.pollutant else "Unknown"
+        serial_number = instance.serial_number
+        
+        super().perform_destroy(instance)
+        invalidate_device_list_cache()
+        
+        # Log to station
+        try:
+            from pollution_backend.measurements.models import SystemLog
+            log = SystemLog.objects.create(
+                station_id=station_id,
+                event_type="SENSOR_REMOVED",
+                message=f"Sensor {pollutant_name} (SN: {serial_number}) removed from station",
+                log_level=SystemLog.WARNING
+            )
+            broadcast_station_log(station_id, log)
+        except Exception as e:
+            print(f"Failed to create station log: {e}")
+
 
 class PollutantViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Pollutant.objects.all()
@@ -271,9 +449,30 @@ class DeviceViewSet(viewsets.ViewSet):
         is_active_param = request.query_params.get("is_active", "all")
         page = int(request.query_params.get("page", 1))
         page_size = min(int(request.query_params.get("page_size", 50)), 200)
-        
         sort_field = request.query_params.get("sort", "id")
         sort_dir = request.query_params.get("order", "asc")
+        
+        cache_version = cache.get("devices:list:version", 0)
+        cache_params = {
+            "v": str(cache_version),
+            "type": str(device_type),
+            "search": str(search),
+            "pollutant": str(pollutant_filter),
+            "is_active": str(is_active_param),
+            "page": str(page),
+            "page_size": str(page_size),
+            "sort": str(sort_field),
+            "order": str(sort_dir)
+        }
+        cache_key = get_device_list_cache_key(cache_params)
+        
+        try:
+            cached_response = cache.get(cache_key)
+            if cached_response is not None:
+                return Response(cached_response)
+        except Exception as e:
+            print(f"Cache read error: {e}")
+
         
         devices = []
         
@@ -378,12 +577,19 @@ class DeviceViewSet(viewsets.ViewSet):
         
         serializer = DeviceSerializer(paginated_devices, many=True)
         
-        return Response({
+        response_data = {
             "count": total_count,
             "next": None if end >= total_count else f"?page={page + 1}",
             "previous": None if page <= 1 else f"?page={page - 1}",
             "results": serializer.data,
-        })
+        }
+        
+        try:
+            cache.set(cache_key, response_data, timeout=300)
+        except Exception as e:
+            print(f"Cache write error: {e}")
+        
+        return Response(response_data)
 class AnomalyLogFilter(filters.FilterSet):
     """Filter for AnomalyLog queryset."""
 

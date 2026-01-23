@@ -82,6 +82,29 @@ class Sensor(models.Model):
         return f"{self.sensor_type} ({self.serial_number or 'No Serial'})"
 
 
+class DeviceStatus(models.Model):
+    """
+    Current device health metrics - one row per sensor.
+    Stores only the latest state, no historical data.
+    """
+
+    sensor = models.OneToOneField(
+        Sensor,
+        on_delete=models.CASCADE,
+        related_name="device_status",
+    )
+    battery_percent = models.IntegerField(default=100) 
+    signal_rssi_dbm = models.IntegerField(default=-50)
+    uptime_seconds = models.BigIntegerField(default=0)
+    last_reset_at = models.DateTimeField(blank=True, null=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "device_status"
+
+    def __str__(self):
+        return f"Status for Sensor {self.sensor_id}"
+
 
 class QualityNorm(models.Model):
     threshold_value = models.FloatField()
@@ -154,7 +177,6 @@ class AnomalyRule(models.Model):
 
     class Meta:
         db_table = "anomalyrule"
-        managed = TESTING
 
     def __str__(self):
         return f"Rule for {self.pollutant.symbol}"
@@ -171,7 +193,6 @@ class GlobalAnomalyConfig(models.Model):
 
     class Meta:
         db_table = "globalanomalyconfig"
-        managed = TESTING
 
     def __str__(self):
         return "Global Anomaly Config"

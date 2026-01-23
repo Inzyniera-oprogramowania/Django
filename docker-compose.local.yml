@@ -25,6 +25,16 @@ services:
       - '8000:8000'
     command: /start
 
+  mqtt_listener:
+    <<: *django
+    container_name: pollution_backend_local_mqtt_listener
+    depends_on:
+      - postgres
+      - redis
+      - mosquitto
+    ports: []
+    command: python manage.py start_mqtt_listener
+
   postgres:
     build:
       context: .

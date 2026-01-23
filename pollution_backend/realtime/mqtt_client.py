@@ -48,6 +48,7 @@ class MQTTClient:
         broker_host: str | None = None,
         broker_port: int | None = None,
         topics: list[str] | None = None,
+        client_id: str | None = None,
     ) -> None:
         """
         Initialize the MQTT client.
@@ -56,13 +57,14 @@ class MQTTClient:
             broker_host: MQTT broker hostname. Defaults to settings.MQTT_BROKER_HOST
             broker_port: MQTT broker port. Defaults to settings.MQTT_BROKER_PORT
             topics: List of topic patterns. Defaults to settings.MQTT_TOPICS
+            client_id: Optional client ID for MQTT connection
         """
         self.broker_host = broker_host or getattr(settings, "MQTT_BROKER_HOST", "mosquitto")
         self.broker_port = broker_port or getattr(settings, "MQTT_BROKER_PORT", 1883)
         self.topics = topics or getattr(settings, "MQTT_TOPICS", ["sensors/#"])
 
         self.client = mqtt.Client(
-            client_id="django_mqtt_client",
+            client_id=client_id or "django_mqtt_client",
             callback_api_version=mqtt.CallbackAPIVersion.VERSION2,
         )
 
@@ -135,8 +137,9 @@ class MQTTClient:
         """
         Callback when a message is received.
 
-        Parses the JSON payload and saves the measurement to the database.
-        Also triggers anomaly detection via Celery task.
+        Parses the JSON payload and routes to appropriate handler:
+        - sensors/{station}/status -> device status updates
+        - sensors/{station}/{pollutant} -> measurement data
 
         Args:
             client: The MQTT client instance
@@ -148,20 +151,26 @@ class MQTTClient:
             payload = message.payload.decode("utf-8")
             logger.debug("Received message on topic '%s': %s", topic, payload)
 
-            # Parse topic to extract station_code and pollutant_symbol
+            # Parse topic to extract station_code and message type
             topic_parts = topic.split("/")
             if len(topic_parts) >= 3:
                 station_code = topic_parts[1]
-                pollutant_symbol = topic_parts[2]
-                logger.debug(
-                    "Parsed topic: station_code=%s, pollutant_symbol=%s",
-                    station_code,
-                    pollutant_symbol,
-                )
+                topic_type = topic_parts[2]
 
-            # Parse JSON payload
-            data = json.loads(payload)
-            self._process_measurement(data)
+                # Parse JSON payload
+                data = json.loads(payload)
+
+                # Route to appropriate handler
+                if topic_type == "status":
+                    self._process_device_status(data)
+                else:
+                    # Existing measurement processing
+                    logger.debug(
+                        "Parsed topic: station_code=%s, pollutant_symbol=%s",
+                        station_code,
+                        topic_type,
+                    )
+                    self._process_measurement(data)
 
         except json.JSONDecodeError as e:
             logger.error("Failed to parse JSON payload: %s", e)
@@ -223,8 +232,123 @@ class MQTTClient:
 
             check_anomaly.delay(sensor_id=sensor_id, value=value, timestamp=timestamp_str)
 
+            # Broadcast measurement via WebSocket
+            from asgiref.sync import async_to_sync
+            from channels.layers import get_channel_layer
+            channel_layer = get_channel_layer()
+            if channel_layer:
+                async_to_sync(channel_layer.group_send)(
+                    f"sensor_{sensor_id}_status",
+                    {
+                        "type": "measurement",
+                        "data": {
+                            "msg_type": "measurement",
+                            "sensor_id": sensor_id,
+                            "value": value,
+                            "unit": unit,
+                            "timestamp": timestamp.isoformat(),
+                        },
+                    },
+                )
+
         except Exception as e:
             logger.exception("Failed to process measurement: %s", e)
+
+    def _process_device_status(self, data: dict[str, Any]) -> None:
+        try:
+            from asgiref.sync import async_to_sync
+            from channels.layers import get_channel_layer
+
+            from pollution_backend.sensors.models import DeviceStatus
+            from pollution_backend.sensors.models import Sensor
+
+            sensor_id = data.get("sensor_id")
+            if not sensor_id:
+                logger.error("Missing sensor_id in device status data: %s", data)
+                return
+
+            print(f"DEBUG: Processing device status for sensor {sensor_id}: {data}", flush=True)
+
+            # Validate sensor exists
+            try:
+                sensor = Sensor.objects.get(id=sensor_id)
+            except Sensor.DoesNotExist:
+                logger.warning("Sensor with ID %d not found, skipping status update", sensor_id)
+                return
+
+            # Retrieve data
+            battery = data.get("battery_percent", 100)
+            rssi = data.get("signal_rssi_dbm", -50)
+            uptime = data.get("uptime_seconds", 0)
+
+            # Handle 0% battery -> deactivate sensor
+            if battery == 0 and sensor.is_active:
+                sensor.is_active = False
+                sensor.save()
+                logger.warning("Sensor %s disabled due to empty battery", sensor_id)
+                try:
+                    from pollution_backend.measurements.models import SystemLog
+                    SystemLog.objects.create(
+                        event_type="BATTERY_CRITICAL",
+                        message=f"Sensor {sensor_id} disabled due to empty battery (0%)",
+                        log_level=SystemLog.WARNING,
+                        sensor_id=sensor_id,
+                    )
+                except Exception as e:
+                    logger.error("Failed to create SystemLog for battery: %s", e)
+            
+            # Log periodic status update to SystemLog (as requested by user)
+            try:
+                from pollution_backend.measurements.models import SystemLog
+                SystemLog.objects.create(
+                    event_type="DEVICE_STATUS",
+                    message=f"Status update: Battery {battery}%, Signal {rssi}dBm, Uptime {uptime}s",
+                    log_level=SystemLog.INFO,
+                    sensor_id=sensor_id,
+                )
+            except Exception as e:
+                logger.error("Failed to create SystemLog: %s", e)
+
+            # Update or create DeviceStatus record
+            status, created = DeviceStatus.objects.update_or_create(
+                sensor_id=sensor_id,
+                defaults={
+                    "battery_percent": battery,
+                    "signal_rssi_dbm": rssi,
+                    "uptime_seconds": uptime,
+                },
+            )
+
+            action = "Created" if created else "Updated"
+            logger.info(
+                "%s device status: sensor_id=%d, battery=%d%%, rssi=%d dBm, uptime=%ds",
+                action,
+                sensor_id,
+                status.battery_percent,
+                status.signal_rssi_dbm,
+                status.uptime_seconds,
+            )
+
+            # Broadcast to WebSocket group
+            channel_layer = get_channel_layer()
+            if channel_layer:
+                async_to_sync(channel_layer.group_send)(
+                    f"sensor_{sensor_id}_status",
+                    {
+                        "type": "status_update",
+                        "data": {
+                            "msg_type": "status",
+                            "sensor_id": sensor_id,
+                            "battery_percent": status.battery_percent,
+                            "signal_rssi_dbm": status.signal_rssi_dbm,
+                            "uptime_seconds": status.uptime_seconds,
+                            "updated_at": status.updated_at.isoformat(),
+                        },
+                    },
+                )
+
+        except Exception as e:
+            logger.exception("Failed to process device status: %s", e)
 
     def connect(self) -> None:
         """

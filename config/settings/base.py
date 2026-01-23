@@ -71,10 +71,12 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 ROOT_URLCONF = "config.urls"
 # https://docs.djangoproject.com/en/dev/ref/settings/#wsgi-application
 WSGI_APPLICATION = "config.wsgi.application"
+ASGI_APPLICATION = "config.asgi.application"
 
 # APPS
 # ------------------------------------------------------------------------------
 DJANGO_APPS = [
+    "daphne",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
@@ -411,3 +413,11 @@ MQTT_BROKER_HOST = env("MQTT_BROKER_HOST", default="mosquitto")
 MQTT_BROKER_PORT = env.int("MQTT_BROKER_PORT", default=1883)
 MQTT_TOPICS = env.list("MQTT_TOPICS", default=["sensors/#"])
 
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [REDIS_URL],
+        },
+    },
+}

@@ -169,6 +169,7 @@ dependencies = [
     "boto3>=1.42.4",
     "celery==5.6.0",
     "channels>=4.3.2",
+    "channels_redis>=4.2.0",
     "collectfasta==3.3.1",
     "crispy-bootstrap5==2025.6",
     "daphne>=4.2.1",
