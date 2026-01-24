@@ -1,5 +1,7 @@
 import sys
-
+import os
+from uuid import uuid4
+from django.utils.timezone import now
 from django.db import models
 
 def report_upload_path(instance, filename):
@@ -18,7 +20,6 @@ class Report(models.Model):
         max_length=500,
         blank=True,
         null=True,
-        db_column="file_path",
     )
     advanced_user = models.ForeignKey(
         "users.AdvancedUser",

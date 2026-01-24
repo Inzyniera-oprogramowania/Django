@@ -1,4 +1,5 @@
 from pollution_backend.measurements.models import Measurement
+import traceback
 from pollution_backend.sensors.models import Sensor
 import json
 import io
@@ -91,7 +92,10 @@ class ExportService:
         
         filename = f"export_{date_from_str}_{date_to_str}.{file_format}"
 
-        return content, content_type, filename, checksum
+        total_records = len(measurements)
+        preview_data = measurements[:5]
+
+        return content, content_type, filename, checksum, total_records, preview_data
 
     def execute_and_save(self):
         result = self.generate_file()
@@ -99,28 +103,43 @@ class ExportService:
         if result is None:
             return None
 
-        content, content_type, filename, checksum = result
+        content, content_type, filename, checksum, total_records, preview_data = result
 
         if isinstance(content, str):
             file_content = ContentFile(content.encode('utf-8'))
         else:
             file_content = ContentFile(content)
 
-        report = Report.objects.create(
-            title=f"Export {self.data['file_format'].upper()} - {filename}",
-            advanced_user=self.user,
-            parameters=self.data
-        )
-        
-        report.file.save(filename, file_content)
-        report.save()
+        try:
+            adv_user = self.user.advanced_profile
+            
+            report_params = self.data.copy()
+            if 'date_from' in report_params:
+                report_params['date_from'] = report_params['date_from'].strftime('%Y-%m-%d')
+            if 'date_to' in report_params:
+                report_params['date_to'] = report_params['date_to'].strftime('%Y-%m-%d')
+
+            report = Report.objects.create(
+                title=f"Export {self.data['file_format'].upper()} - {filename}",
+                advanced_user=adv_user,
+                parameters=report_params
+            )
+            
+            report.file.save(filename, file_content)
+            report.save()
+        except Exception as e:
+            print(f"ERROR: Database save failed: {e}")
+            traceback.print_exc()
+            report = None
         
         return {
             "report_obj": report,
             "content": content,
             "content_type": content_type,
             "filename": filename,
-            "checksum": checksum
+            "checksum": checksum,
+            "total_records": total_records,
+            "preview_data": preview_data
         }
 
     def _generate_csv(self, measurements):
@@ -182,4 +201,4 @@ class ExportService:
         pdf_value = buffer.getvalue()
         buffer.close()
 
-        return pdf_value.decode('latin1'), "application/pdf"
+        return pdf_value, "application/pdf"

@@ -1,16 +1,21 @@
 from django.core.files.base import ContentFile
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from pollution_backend.users.models import AdvancedUser
+from pollution_backend.users.api.permissions import IsAdvancedUser
 from rest_framework.permissions import IsAuthenticated
 from pollution_backend.reports.api.serializers import DataExportRequestSerializer, ReportIssueCreateSerializer
 from pollution_backend.services.reports import ExportService
-from rest_framework import status
+from rest_framework import status, permissions, generics
 from drf_spectacular.utils import extend_schema
-from django.http import HttpResponse as HTTPResponse
-from rest_framework import generics
+from django.http import HttpResponse as HTTPResponse, FileResponse, Http404
+from django.shortcuts import get_object_or_404
+
+from pollution_backend.measurements.api.serializers import MeasurementSerializer
+from pollution_backend.reports.models import Report, ReportIssue
 
 class MeasurementExportView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsAdvancedUser]
     serializer_class = DataExportRequestSerializer
 
     @extend_schema(
@@ -30,19 +35,40 @@ class MeasurementExportView(APIView):
             return Response({"detail": "No data found for the given filters."}, status=status.HTTP_404_NOT_FOUND)
         
         content = result['content']
-        content_type = result['content_type']
         filename = result['filename']
         checksum = result['checksum']
+        total_records = result['total_records']
+        preview_data = result['preview_data']
+        report_obj = result.get('report_obj')
 
-        response = HTTPResponse(content, content_type=content_type)
-        response['Content-Disposition'] = f'attachment; filename="{filename}"'
-        response['X-Checksum-SHA256'] = checksum
+        return Response({
+            'report_id': report_obj.id if report_obj else None,
+            'total_records': total_records,
+            'preview_data': preview_data,
+            'filename': filename,
+            'checksum': checksum
+        })
 
-        return response 
+
+class ReportDownloadView(APIView):
+    permission_classes = [IsAuthenticated, IsAdvancedUser]
+
+    def get(self, request, report_id):
+        report = get_object_or_404(Report, id=report_id)
+
+        try:
+            file_handle = report.file.open('rb')
+            response = FileResponse(file_handle, content_type='application/octet-stream')
+            response['Content-Disposition'] = f'attachment; filename="{report.file.name.split("/")[-1]}"'
+            return response
+        except FileNotFoundError:
+            raise Http404("File not found")
+ 
 
 class ReportIssueCreateView(generics.CreateAPIView):
+    queryset = ReportIssue.objects.all()
     serializer_class = ReportIssueCreateSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsAdvancedUser]
 
     def perform_create(self, serializer):
         report_id = self.kwargs.get('report_id')
@@ -50,5 +76,5 @@ class ReportIssueCreateView(generics.CreateAPIView):
 
         serializer.save(
             report=report,
-            user=self.request.user
+            user=self.request.user.advanced_profile
         )
