@@ -6,6 +6,7 @@ from rest_framework import serializers
 from pollution_backend.users.models import AdvancedUser
 from pollution_backend.users.models import Institution
 from pollution_backend.users.models import Resident
+from ..models import ApiKey
 
 User = get_user_model()
 
@@ -105,3 +106,9 @@ class CustomRegisterSerializer(RegisterSerializer):
                 specialization=self.validated_data.get("specialization"),
             )
         return user
+
+class ApiKeySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ApiKey
+        fields = ['id', 'label', 'key', 'station', 'created_at', 'expires_at', 'is_active']
+        read_only_fields = ['key', 'created_at', 'expires_at']

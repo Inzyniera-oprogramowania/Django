@@ -1,19 +1,25 @@
 from datetime import datetime
-
+from rest_framework import status
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.throttling import ScopedRateThrottle
+from rest_framework.views import APIView
 from rest_framework import mixins
 from rest_framework import viewsets
 from rest_framework.decorators import action
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import ValidationError   
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
-
+from pollution_backend.users.api.permissions import IsAdvancedUser 
 from pollution_backend.measurements.api.serializers import (
     AggregatedMeasurementSerializer,
 )
-from pollution_backend.measurements.api.serializers import MeasurementSerializer
+from pollution_backend.measurements.api.serializers import MeasurementSerializer, MeasurementImportSerializer
+from pollution_backend.users.authentication import ApiKeyAuthentication
 from pollution_backend.measurements.models import Measurement
 from pollution_backend.selectors.measurements import get_aggregated_measurements
 from pollution_backend.selectors.measurements import get_measurements_for_sensor
+from pollution_backend.services.measurements import MeasurementImportService
+from drf_spectacular.utils import extend_schema
 
 SENSOR_ID_REQUIRED = "sensor_id query parameter is required."
 
@@ -89,7 +95,6 @@ class SystemLogViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         queryset = super().get_queryset()
         
-        # Filter by device
         sensor_id = self.request.query_params.get('sensor_id')
         station_id = self.request.query_params.get('station_id')
         
@@ -100,3 +105,42 @@ class SystemLogViewSet(viewsets.ModelViewSet):
             
         return queryset
 
+class MeasurementImportView(APIView):
+    authentication_classes = [ApiKeyAuthentication]
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'import_data'
+
+    @extend_schema(
+        request=MeasurementImportSerializer,
+        responses={
+            201: None, 
+            400: "Błąd parsowania JSON", 
+            401: "Nieautoryzowany", 
+            422: "Błąd walidacji biznesowej"
+        },
+        description="Importuje pojedynczy pomiar lub paczkę danych."
+    )
+    def post(self, request, *args, **kwargs):
+        serializer = MeasurementImportSerializer(data=request.data, context={'request': request})
+        
+        if not serializer.is_valid():
+            return Response(
+                {"code": "VALIDATION_ERROR", "errors": serializer.errors},
+                status=status.HTTP_422_UNPROCESSABLE_ENTITY
+            )
+
+        try:
+            service = MeasurementImportService(serializer.validated_data)
+            service.process_import()
+            
+            return Response(
+                {"detail": "Data imported successfully."}, 
+                status=status.HTTP_201_CREATED
+            )
+
+        except Exception as e:
+            return Response(
+                {"detail": "Internal Server Error during processing."}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
