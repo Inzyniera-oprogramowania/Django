@@ -11,7 +11,22 @@ from pollution_backend.sensors.models import QualityNorm
 from pollution_backend.sensors.models import Sensor
 
 
+class PollutantNestedSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Pollutant
+        fields = ["id", "name", "symbol"]
+
+
+class MonitoringStationNestedSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = MonitoringStation
+        fields = ["id", "station_code"]
+
+
 class SensorSerializer(serializers.ModelSerializer):
+    pollutant = PollutantNestedSerializer(read_only=True)
+    monitoring_station = MonitoringStationNestedSerializer(read_only=True)
+
     class Meta:
         model = Sensor
         fields = "__all__"
@@ -183,4 +198,22 @@ class GlobalAnomalyConfigSerializer(serializers.ModelSerializer):
         model = GlobalAnomalyConfig
         fields = ["id", "missing_data_timeout_minutes"]
         read_only_fields = ["id"]
+
+
+# Serializers for Dropdowns (Performance Optimization)
+
+class StationDropdownSerializer(serializers.ModelSerializer):
+    address = serializers.CharField(source="location.full_address", read_only=True)
+
+    class Meta:
+        model = MonitoringStation
+        fields = ["id", "station_code", "address"]
+
+
+class SensorDropdownSerializer(serializers.ModelSerializer):
+    pollutant_symbol = serializers.CharField(source="pollutant.symbol", read_only=True)
+
+    class Meta:
+        model = Sensor
+        fields = ["id", "serial_number", "pollutant_symbol"]
 

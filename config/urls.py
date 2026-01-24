@@ -26,6 +26,7 @@ urlpatterns = [
     # Your stuff: custom urls includes go here
     path("api/", include("pollution_backend.sensors.api.urls")),
     path("api/", include("pollution_backend.measurements.api.urls")),
+    path("api/analysis/", include("pollution_backend.analysis.api.urls")),
     path("api/forecast/", include("pollution_backend.forecasts.api.urls")),
     path("api/model-validation/", include("pollution_backend.model_validation.api.urls")),
     path("api/reports/", include("pollution_backend.reports.api.urls")),

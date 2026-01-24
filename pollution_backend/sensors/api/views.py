@@ -31,6 +31,9 @@ from .serializers import MonitoringStationGeoSerializer
 from .serializers import PollutantSerializer
 from .serializers import QualityNormSerializer
 from .serializers import SensorSerializer
+from .serializers import StationDropdownSerializer
+from .serializers import SensorDropdownSerializer
+
 
 
 
@@ -104,6 +107,14 @@ class MonitoringStationViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
 
+    @action(detail=False, url_path="dropdown")
+    def dropdown(self, request):
+        """Optimized endpoint for station dropdowns."""
+        queryset = self.filter_queryset(get_active_stations())
+        # Disable pagination for dropdowns
+        serializer = StationDropdownSerializer(queryset, many=True)
+        return Response(serializer.data)
+
     def get_queryset(self):
         queryset = get_active_stations()
         
@@ -136,6 +147,8 @@ class MonitoringStationViewSet(viewsets.ModelViewSet):
             return MonitoringStationGeoSerializer
         if self.action == "all_stations":
             return MonitoringStationFlatSerializer
+        if self.action == "dropdown":
+            return StationDropdownSerializer
         return MonitoringStationDetailSerializer
 
     @action(detail=False, methods=["post"], url_path="validate_address")
@@ -252,6 +265,8 @@ class SensorViewSet(viewsets.ModelViewSet):
         if self.action == "create":
             from .serializers import SensorCreateSerializer
             return SensorCreateSerializer
+        if self.action == "dropdown":
+            return SensorDropdownSerializer
         return SensorSerializer
 
     def get_queryset(self):
@@ -287,6 +302,12 @@ class SensorViewSet(viewsets.ModelViewSet):
         
         return queryset
 
+    @action(detail=False, url_path="dropdown")
+    def dropdown(self, request):
+        """Optimized endpoint for sensor dropdowns."""
+        queryset = self.filter_queryset(self.get_queryset())
+        serializer = SensorDropdownSerializer(queryset, many=True)
+        return Response(serializer.data)
     @action(detail=True, methods=["post"], url_path="reset")
     def reset(self, request, pk=None):
         from asgiref.sync import async_to_sync
@@ -587,7 +608,7 @@ class DeviceViewSet(viewsets.ViewSet):
         try:
             cache.set(cache_key, response_data, timeout=300)
         except Exception as e:
-            print(f"Cache write error: {e}")
+            pass
         
         return Response(response_data)
 class AnomalyLogFilter(filters.FilterSet):
@@ -619,6 +640,7 @@ class AnomalyLogViewSet(viewsets.ModelViewSet):
 
     queryset = AnomalyLog.objects.all()
     serializer_class = AnomalyLogSerializer
+    pagination_class = DevicePagination
     filterset_class = AnomalyLogFilter
     filter_backends = [filters.DjangoFilterBackend, OrderingFilter]
     ordering_fields = ["detected_at", "status", "sensor__id"]

@@ -38,7 +38,6 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     class Meta:
         db_table = '"User"'
-        managed = TESTING
 
     def __str__(self):
         return self.email
@@ -53,7 +52,6 @@ class Institution(models.Model):
 
     class Meta:
         db_table = "institution"
-        managed = TESTING
 
     def __str__(self):
         return self.name
@@ -78,7 +76,6 @@ class AdvancedUser(models.Model):
 
     class Meta:
         db_table = "advanceduser"
-        managed = TESTING
 
     def __str__(self):
         return f"Expert: {self.user.email}"
@@ -97,7 +94,6 @@ class Resident(models.Model):
 
     class Meta:
         db_table = "resident"
-        managed = TESTING
 
     def __str__(self):
         return f"Resident: {self.user.email}"
