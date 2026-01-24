@@ -9,11 +9,13 @@ from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph
 from reportlab.lib.styles import getSampleStyleSheet
-
+from django.core.files.base import ContentFile
+from pollution_backend.reports.models import Report
 
 class ExportService:
-    def __init__(self, validate_data):
+    def __init__(self, validate_data, user):
         self.data = validate_data
+        self.user = user
         self.sensor_map = self._get_sensor_metadata()
         self.queryset = self._get_measurements()
 
@@ -90,6 +92,36 @@ class ExportService:
         filename = f"export_{date_from_str}_{date_to_str}.{file_format}"
 
         return content, content_type, filename, checksum
+
+    def execute_and_save(self):
+        result = self.generate_file()
+        
+        if result is None:
+            return None
+
+        content, content_type, filename, checksum = result
+
+        if isinstance(content, str):
+            file_content = ContentFile(content.encode('utf-8'))
+        else:
+            file_content = ContentFile(content)
+
+        report = Report.objects.create(
+            title=f"Export {self.data['file_format'].upper()} - {filename}",
+            advanced_user=self.user,
+            parameters=self.data
+        )
+        
+        report.file.save(filename, file_content)
+        report.save()
+        
+        return {
+            "report_obj": report,
+            "content": content,
+            "content_type": content_type,
+            "filename": filename,
+            "checksum": checksum
+        }
 
     def _generate_csv(self, measurements):
         output = io.StringIO()

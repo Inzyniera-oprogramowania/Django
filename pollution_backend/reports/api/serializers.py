@@ -1,5 +1,5 @@
 from rest_framework import serializers
-
+from pollution_backend.reports.models import ReportIssue
 class DataExportRequestSerializer(serializers.Serializer):
     FORMAT_CHOICES = [
         ('csv', 'CSV'),
@@ -29,3 +29,9 @@ class DataExportRequestSerializer(serializers.Serializer):
         if data['date_from'] > data['date_to']:
             raise serializers.ValidationError("date_from cannot be later than date_to.")
         return data
+
+
+class ReportIssueCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ReportIssue
+        fields = ['description']
