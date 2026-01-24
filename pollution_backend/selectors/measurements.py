@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from django.db.models import Avg
 from django.db.models import Max
 from django.db.models import Min
@@ -6,8 +8,19 @@ from django.db.models.functions import Trunc
 from pollution_backend.measurements.models import Measurement
 
 
-def get_measurements_for_sensor(sensor_id: int):
-    return Measurement.objects.filter(sensor_id=sensor_id).order_by("-time")
+def get_measurements_for_sensor(
+    sensor_id: int,
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
+):
+    queryset = Measurement.objects.filter(sensor_id=sensor_id)
+
+    if date_from:
+        queryset = queryset.filter(time__gte=date_from)
+    if date_to:
+        queryset = queryset.filter(time__lte=date_to)
+
+    return queryset.order_by("-time")
 
 
 def get_aggregated_measurements(sensor_id: int, interval: str):

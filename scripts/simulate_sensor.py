@@ -16,6 +16,10 @@ Requirements:
     pip install paho-mqtt
 """
 
+# TODO wszystko pobierane z bazy i cron, dodanie logów systemowych, zuzycia baterii, sygnał, uptime, reset?
+
+
+
 import argparse
 import json
 import logging
@@ -74,6 +78,39 @@ def generate_measurement(
     }
 
 
+# Track uptime across calls
+_uptime_start = time.time()
+
+
+def generate_device_status(sensor_id: int) -> dict:
+    """
+    Generate a device status payload with battery, signal, and uptime.
+
+    Args:
+        sensor_id: ID of the sensor
+
+    Returns:
+        Dictionary with device status data
+    """
+    # Simulate battery drain (starts at 100%, decreases slowly)
+    elapsed_minutes = (time.time() - _uptime_start) / 60
+    battery = max(5, 100 - int(elapsed_minutes * 0.5))  # Lose 0.5% per minute
+
+    # Simulate signal strength fluctuation
+    signal = random.randint(-80, -40)
+
+    # Calculate uptime in seconds
+    uptime = int(time.time() - _uptime_start)
+
+    return {
+        "sensor_id": sensor_id,
+        "battery_percent": battery,
+        "signal_rssi_dbm": signal,
+        "uptime_seconds": uptime,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+
 def on_connect(client, userdata, flags, reason_code, properties):
     """Callback when connected to MQTT broker."""
     if reason_code == 0:
@@ -87,11 +124,27 @@ def on_publish(client, userdata, mid, reason_code, properties):
     logger.debug("Message published (mid=%d)", mid)
 
 
+def on_message(client, userdata, msg):
+    """Handle incoming messages."""
+    global _uptime_start
+    try:
+        payload = json.loads(msg.payload.decode())
+        if payload.get("command") == "RESET":
+            logger.info("Received RESET command. Resetting uptime and battery.")
+            _uptime_start = time.time()
+    except Exception as e:
+        logger.error("Failed to process message: %s", e)
+
+
 def main():
     """Main entry point."""
     parser = argparse.ArgumentParser(
         description="Simulate an IoT sensor publishing MQTT messages",
     )
+    # ... (skipping arguments, assuming they are unchanged until we modify main)
+    # Actually, replacement content must match precisely.
+    # I should target a smaller block inside main or define on_message before main.
+    # Let's define on_message before main first.
     parser.add_argument(
         "--host",
         default="localhost",
@@ -137,19 +190,35 @@ def main():
         default="µg/m³",
         help="Measurement unit (default: µg/m³)",
     )
+    parser.add_argument(
+        "--status",
+        action="store_true",
+        help="Send device status messages instead of measurements",
+    )
+    parser.add_argument(
+        "--status-interval",
+        type=float,
+        default=30.0,
+        help="Status publish interval in seconds (default: 30.0)",
+    )
 
     args = parser.parse_args()
 
-    # Build topic
-    topic = f"sensors/{args.station}/{args.pollutant}"
+    # Build topic based on mode
+    if args.status:
+        topic = f"sensors/{args.station}/status"
+    else:
+        topic = f"sensors/{args.station}/{args.pollutant}"
 
     # Create MQTT client
+    suffix = "_status" if args.status else "_meas"
     client = mqtt.Client(
-        client_id=f"simulator_{args.sensor_id}",
+        client_id=f"simulator_{args.sensor_id}{suffix}",
         callback_api_version=mqtt.CallbackAPIVersion.VERSION2,
     )
     client.on_connect = on_connect
     client.on_publish = on_publish
+    client.on_message = on_message
 
     logger.info("Connecting to %s:%d...", args.host, args.port)
     try:
@@ -160,35 +229,61 @@ def main():
 
     client.loop_start()
 
+    # Subscribe to command topic
+    command_topic = f"sensors/{args.station}/command"
+    client.subscribe(command_topic)
+    logger.info("Subscribed to command topic: %s", command_topic)
+
+    # Determine interval and mode
+    interval = args.status_interval if args.status else args.interval
+    mode_name = "status" if args.status else "measurement"
+
     logger.info(
-        "Publishing to topic '%s' every %.1f seconds (Ctrl+C to stop)",
+        "Publishing %s to topic '%s' every %.1f seconds (Ctrl+C to stop)",
+        mode_name,
         topic,
-        args.interval,
+        interval,
     )
 
     sent = 0
     try:
         while args.count == 0 or sent < args.count:
-            measurement = generate_measurement(
-                sensor_id=args.sensor_id,
-                pollutant=args.pollutant,
-                unit=args.unit,
-            )
-            payload = json.dumps(measurement)
-
-            result = client.publish(topic, payload, qos=1)
-            if result.rc == mqtt.MQTT_ERR_SUCCESS:
-                logger.info(
-                    "Published: topic=%s, value=%.2f %s",
-                    topic,
-                    measurement["value"],
-                    measurement["unit"],
-                )
-                sent += 1
+            if args.status:
+                # Device status mode
+                message = generate_device_status(sensor_id=args.sensor_id)
+                payload = json.dumps(message)
+                result = client.publish(topic, payload, qos=1)
+                if result.rc == mqtt.MQTT_ERR_SUCCESS:
+                    logger.info(
+                        "Published status: battery=%d%%, signal=%d dBm, uptime=%ds",
+                        message["battery_percent"],
+                        message["signal_rssi_dbm"],
+                        message["uptime_seconds"],
+                    )
+                    sent += 1
+                else:
+                    logger.error("Failed to publish: %s", result.rc)
             else:
-                logger.error("Failed to publish: %s", result.rc)
+                # Measurement mode (original behavior)
+                measurement = generate_measurement(
+                    sensor_id=args.sensor_id,
+                    pollutant=args.pollutant,
+                    unit=args.unit,
+                )
+                payload = json.dumps(measurement)
+                result = client.publish(topic, payload, qos=1)
+                if result.rc == mqtt.MQTT_ERR_SUCCESS:
+                    logger.info(
+                        "Published: topic=%s, value=%.2f %s",
+                        topic,
+                        measurement["value"],
+                        measurement["unit"],
+                    )
+                    sent += 1
+                else:
+                    logger.error("Failed to publish: %s", result.rc)
 
-            time.sleep(args.interval)
+            time.sleep(interval)
 
     except KeyboardInterrupt:
         logger.info("\nStopping simulator...")

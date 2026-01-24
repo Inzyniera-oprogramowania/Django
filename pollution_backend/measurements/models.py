@@ -9,3 +9,32 @@ class Measurement(models.Model):
 
     class Meta:
         db_table = "measurement"
+
+
+class SystemLog(models.Model):
+    INFO = "info"
+    WARNING = "warning"
+    ERROR = "error"
+    SUCCESS = "success"
+
+    LOG_TYPE_CHOICES = [
+        (INFO, "Info"),
+        (WARNING, "Warning"),
+        (ERROR, "Error"),
+        (SUCCESS, "Success")
+    ]
+
+    event_type = models.CharField(max_length=50)
+    message = models.TextField()
+    timestamp = models.DateTimeField(auto_now_add=True)
+    log_level = models.CharField(max_length=20, choices=LOG_TYPE_CHOICES, default=INFO)
+    sensor_id = models.IntegerField(null=True, blank=True, db_index=True)
+    station_id = models.IntegerField(null=True, blank=True, db_index=True)
+
+    class Meta:
+        db_table = "systemlog"
+        ordering = ["-timestamp"]
+
+    def __str__(self):
+        return f"[{self.timestamp}] {self.event_type}: {self.message}]"
+

@@ -14,3 +14,11 @@ class AggregatedMeasurementSerializer(serializers.Serializer):
     avg_value = serializers.FloatField()
     min_value = serializers.FloatField()
     max_value = serializers.FloatField()
+
+
+class SystemLogSerializer(serializers.ModelSerializer):
+    class Meta:
+        from pollution_backend.measurements.models import SystemLog
+        model = SystemLog
+        fields = "__all__"
+

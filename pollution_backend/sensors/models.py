@@ -61,6 +61,8 @@ class Sensor(models.Model):
     serial_number = models.CharField(unique=True, max_length=100, blank=True, null=True)
     calibration_date = models.DateField(blank=True, null=True)
     is_active = models.BooleanField(default=True)
+    measurement_range_max = models.FloatField(blank=True, null=True)
+    send_interval_seconds = models.IntegerField(blank=True, null=True)
     monitoring_station = models.ForeignKey(
         MonitoringStation,
         on_delete=models.CASCADE,
@@ -78,6 +80,30 @@ class Sensor(models.Model):
 
     def __str__(self):
         return f"{self.sensor_type} ({self.serial_number or 'No Serial'})"
+
+
+class DeviceStatus(models.Model):
+    """
+    Current device health metrics - one row per sensor.
+    Stores only the latest state, no historical data.
+    """
+
+    sensor = models.OneToOneField(
+        Sensor,
+        on_delete=models.CASCADE,
+        related_name="device_status",
+    )
+    battery_percent = models.IntegerField(default=100) 
+    signal_rssi_dbm = models.IntegerField(default=-50)
+    uptime_seconds = models.BigIntegerField(default=0)
+    last_reset_at = models.DateTimeField(blank=True, null=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "device_status"
+
+    def __str__(self):
+        return f"Status for Sensor {self.sensor_id}"
 
 
 class QualityNorm(models.Model):
@@ -101,9 +127,20 @@ class QualityNorm(models.Model):
 
 
 class AnomalyLog(models.Model):
+    PENDING = "pending"
+    CONFIRMED = "confirmed"
+    DISMISSED = "dismissed"
+
+    STATUS_CHOICES = [
+        (PENDING, "Pending"),
+        (CONFIRMED, "Confirmed"),
+        (DISMISSED, "Dismissed"),
+    ]
+
     description = models.CharField(max_length=255)
     detected_at = models.DateTimeField()
-    status = models.CharField(max_length=50)
+    status = models.CharField(max_length=50, choices=STATUS_CHOICES, default=PENDING)
+    severity = models.CharField(max_length=20, default="warning")  # warning or critical
     sensor = models.ForeignKey(Sensor, on_delete=models.CASCADE, db_column="sensorid")
 
     class Meta:
@@ -112,3 +149,57 @@ class AnomalyLog(models.Model):
 
     def __str__(self):
         return f"Anomaly: {self.description[:30]}..."
+
+
+
+
+class AnomalyRule(models.Model):
+    """
+    Per-pollutant anomaly detection rules.
+    """
+
+    pollutant = models.OneToOneField(
+        Pollutant,
+        on_delete=models.CASCADE,
+        db_column="pollutantid",
+        related_name="anomaly_rule",
+    )
+    is_enabled = models.BooleanField(default=True)
+    warning_threshold = models.FloatField(help_text="Warning threshold in μg/m³")
+    critical_threshold = models.FloatField(help_text="Critical threshold in μg/m³")
+    sudden_change_enabled = models.BooleanField(default=True)
+    sudden_change_percent = models.FloatField(
+        default=50, help_text="Trigger if value changes by this % in sudden_change_minutes"
+    )
+    sudden_change_minutes = models.IntegerField(
+        default=10, help_text="Time window for sudden change detection"
+    )
+
+    class Meta:
+        db_table = "anomalyrule"
+
+    def __str__(self):
+        return f"Rule for {self.pollutant.symbol}"
+
+
+class GlobalAnomalyConfig(models.Model):
+    """
+    Global anomaly detection configuration (singleton).
+    """
+
+    missing_data_timeout_minutes = models.IntegerField(
+        default=30, help_text="Alert if sensor doesn't send data for this many minutes"
+    )
+
+    class Meta:
+        db_table = "globalanomalyconfig"
+
+    def __str__(self):
+        return "Global Anomaly Config"
+
+    @classmethod
+    def get_config(cls):
+        """Get or create the singleton config instance."""
+        config, _ = cls.objects.get_or_create(pk=1)
+        return config
+
