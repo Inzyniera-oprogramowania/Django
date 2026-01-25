@@ -110,5 +110,5 @@ class CustomRegisterSerializer(RegisterSerializer):
 class ApiKeySerializer(serializers.ModelSerializer):
     class Meta:
         model = ApiKey
-        fields = ['id', 'label', 'key', 'station', 'created_at', 'expires_at', 'is_active', 'request_count']
-        read_only_fields = ['key', 'created_at', 'expires_at']
+        fields = ['id', 'label', 'key', 'station', 'created_at', 'expires_at', 'is_active', 'request_count', 'limit']
+        read_only_fields = ['key', 'created_at', 'expires_at', 'limit']

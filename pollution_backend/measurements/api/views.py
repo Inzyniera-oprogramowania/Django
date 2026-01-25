@@ -1,4 +1,6 @@
 from datetime import datetime
+from django.utils.decorators import method_decorator
+from django.db import transaction, IntegrityError
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.throttling import ScopedRateThrottle
@@ -91,7 +93,7 @@ class SystemLogViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     queryset = SystemLog.objects.all()
     serializer_class = SystemLogSerializer
-    pagination_class = None
+    pagination_class = MeasurementPagination
     
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -113,6 +115,8 @@ class SystemLogViewSet(viewsets.ModelViewSet):
 
         return queryset
 
+@method_decorator(transaction.non_atomic_requests, name='dispatch')
+@method_decorator(transaction.non_atomic_requests(using='timeseries'), name='dispatch')
 class MeasurementImportView(APIView):
     authentication_classes = [ApiKeyAuthentication]
     permission_classes = [IsAuthenticated]
@@ -130,7 +134,8 @@ class MeasurementImportView(APIView):
         description="Importuje pojedynczy pomiar lub paczkę danych."
     )
     def post(self, request, *args, **kwargs):
-        serializer = MeasurementImportSerializer(data=request.data, context={'request': request})
+        is_many = isinstance(request.data, list)
+        serializer = MeasurementImportSerializer(data=request.data, many=is_many, context={'request': request})
         
         if not serializer.is_valid():
             return Response(
@@ -139,24 +144,47 @@ class MeasurementImportView(APIView):
             )
 
         try:
-            service = MeasurementImportService(serializer.validated_data)
-            service.process_import()
+            items = serializer.validated_data if is_many else [serializer.validated_data]
+            
+            for item_data in items:
+                service = MeasurementImportService(item_data)
+                service.process_import()
             
             if hasattr(request, 'auth') and hasattr(request.auth, 'request_count'):
                 request.auth.request_count += 1
                 request.auth.save()
 
+            if is_many:
+                msg = f"Batch imported {len(items)} measurements."
+                sensor_id = items[0]['sensor_id'] if items else None 
+            else:
+                msg = f"Imported measurement for sensor {items[0]['sensor_id']} at {items[0]['timestamp']}"
+                sensor_id = items[0]['sensor_id']
+
             SystemLog.objects.create(
                 event_type="import_success",
-                message=f"Imported measurement for sensor {serializer.validated_data['sensor_id']} at {serializer.validated_data['timestamp']}",
+                message=msg,
                 log_level=SystemLog.SUCCESS,
-                sensor_id=serializer.validated_data['sensor_id'],
+                sensor_id=sensor_id,
                 user=request.user
             )
 
             return Response(
-                {"detail": "Data imported successfully."}, 
+                {"detail": f"Successfully imported {len(items)} items."}, 
                 status=status.HTTP_201_CREATED
+            )
+
+        except IntegrityError:
+            msg = "Duplikat: Pomiar dla tego sensora z taką samą datą już istnieje."
+            SystemLog.objects.create(
+                event_type="import_error",
+                message=msg,
+                log_level=SystemLog.ERROR,
+                user=request.user if request.user.is_authenticated else None
+            )
+            return Response(
+                {"detail": msg}, 
+                status=status.HTTP_409_CONFLICT
             )
 
         except Exception as e:

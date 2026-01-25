@@ -128,6 +128,7 @@ class ApiKey(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     expires_at = models.DateTimeField(default=default_expiration)
     request_count = models.IntegerField(default=0)
+    limit = models.IntegerField(default=200)
 
     def save(self, *args, **kwargs):
         if not self.key:

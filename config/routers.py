@@ -16,7 +16,6 @@ class PollutionRouter:
             obj1._meta.app_label in self.route_app_labels  # noqa: SLF001
             or obj2._meta.app_label in self.route_app_labels  # noqa: SLF001
         ):
-            # Allow relations to users app (e.g. for SystemLog)
             if obj1._meta.app_label == 'users' or obj2._meta.app_label == 'users':
                 return True
             return obj1._meta.app_label == obj2._meta.app_label  # noqa: SLF001

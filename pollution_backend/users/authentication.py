@@ -17,4 +17,7 @@ class ApiKeyAuthentication(BaseAuthentication):
         if not api_key.is_valid:
             raise AuthenticationFailed('Klucz API wygasł lub jest nieaktywny')
 
+        if api_key.request_count >= api_key.limit:
+            raise AuthenticationFailed('Przekroczono limit zapytań dla tego klucza API')
+
         return (api_key.user, api_key)
