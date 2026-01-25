@@ -8,6 +8,8 @@ from pollution_backend.users.models import ApiKey
 from ..api.serializers import ApiKeySerializer
 from pollution_backend.users.models import Institution
 from .serializers import UserSerializer, InstitutionSerializer
+from django.utils import timezone
+from datetime import timedelta
 
 User = get_user_model()
 
@@ -60,8 +62,6 @@ class ApiKeyViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     def expire(self, request, pk=None):
         api_key = self.get_object()
-        from django.utils import timezone
-        from datetime import timedelta
         api_key.expires_at = timezone.now() - timedelta(seconds=1)
         api_key.save()
         return Response({'status': 'Key expired'})

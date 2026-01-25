@@ -9,33 +9,16 @@ from django.utils import timezone
 import secrets
 from datetime import timedelta
 from django.conf import settings
+from pollution_backend.users.managers import UserManager
 
 TESTING = "pytest" in sys.modules
-
-
-class CustomUserManager(BaseUserManager):
-    def create_user(self, email, password=None, **extra_fields):
-        if not email:
-            msg = "The Email field must be set"
-            raise ValueError(msg)
-        email = self.normalize_email(email)
-        user = self.model(email=email, **extra_fields)
-        user.set_password(password)
-        user.save(using=self._db)
-        return user
-
-    def create_superuser(self, email, password=None, **extra_fields):
-        extra_fields.setdefault("is_staff", True)
-        extra_fields.setdefault("is_superuser", True)
-        return self.create_user(email, password, **extra_fields)
-
 
 class User(AbstractBaseUser, PermissionsMixin):
     email = models.EmailField(unique=True, max_length=255)
     is_staff = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
     date_joined = models.DateTimeField(default=timezone.now)
-    objects = CustomUserManager()
+    objects = UserManager()
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = []
 
