@@ -2,6 +2,7 @@
 
 import django.contrib.gis.db.models.fields
 import django.utils.timezone
+import django.db.models.deletion
 from django.db import migrations, models
 import sys
 
@@ -29,19 +30,7 @@ class Migration(migrations.Migration):
             ],
             options={
                 'db_table': '"User"',
-                'managed': TESTING,
-            },
-        ),
-        migrations.CreateModel(
-            name='AdvancedUser',
-            fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('specialization', models.CharField(blank=True, max_length=100, null=True)),
-                ('employment_date', models.DateField(blank=True, null=True)),
-            ],
-            options={
-                'db_table': 'advanceduser',
-                'managed': TESTING,
+                'managed': True,
             },
         ),
         migrations.CreateModel(
@@ -56,7 +45,21 @@ class Migration(migrations.Migration):
             ],
             options={
                 'db_table': 'institution',
-                'managed': TESTING,
+                'managed': True,
+            },
+        ),
+        migrations.CreateModel(
+            name='AdvancedUser',
+            fields=[
+                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('specialization', models.CharField(blank=True, max_length=100, null=True)),
+                ('employment_date', models.DateField(blank=True, null=True)),
+                ('user', models.OneToOneField(db_column='userid', on_delete=django.db.models.deletion.CASCADE, related_name='advanced_profile', to='users.user')),
+                ('institution', models.ForeignKey(blank=True, db_column='institutionid', null=True, on_delete=django.db.models.deletion.SET_NULL, to='users.institution')),
+            ],
+            options={
+                'db_table': 'advanceduser',
+                'managed': True,
             },
         ),
         migrations.CreateModel(
@@ -66,10 +69,11 @@ class Migration(migrations.Migration):
                 ('home_location', django.contrib.gis.db.models.fields.PointField(blank=True, null=True, srid=4326)),
                 ('h3_index', models.CharField(blank=True, max_length=15, null=True)),
                 ('city', models.CharField(blank=True, max_length=100, null=True)),
+                ('user', models.OneToOneField(db_column='userid', on_delete=django.db.models.deletion.CASCADE, related_name='resident_profile', to='users.user')),
             ],
             options={
                 'db_table': 'resident',
-                'managed': TESTING,
+                'managed': True,
             },
         ),
     ]

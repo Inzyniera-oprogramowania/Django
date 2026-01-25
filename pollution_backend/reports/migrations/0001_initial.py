@@ -21,7 +21,7 @@ class Migration(migrations.Migration):
             ],
             options={
                 'db_table': 'report',
-                'managed': False,
+                'managed': True,
             },
         ),
         migrations.CreateModel(

@@ -92,6 +92,8 @@ class DeviceStatus(models.Model):
         Sensor,
         on_delete=models.CASCADE,
         related_name="device_status",
+        null=True,
+        blank=True,
     )
     battery_percent = models.IntegerField(default=100) 
     signal_rssi_dbm = models.IntegerField(default=-50)
@@ -163,6 +165,8 @@ class AnomalyRule(models.Model):
         on_delete=models.CASCADE,
         db_column="pollutantid",
         related_name="anomaly_rule",
+        null=True,
+        blank=True,
     )
     is_enabled = models.BooleanField(default=True)
     warning_threshold = models.FloatField(help_text="Warning threshold in μg/m³")

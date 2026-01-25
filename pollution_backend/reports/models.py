@@ -14,17 +14,14 @@ def report_upload_path(instance, filename):
 
 class Report(models.Model):
     title = models.CharField(max_length=255)
-    created_at = models.DateTimeField(auto_now_add=True)
-    file = models.FileField(
-        upload_to=report_upload_path,
-        max_length=500,
-        blank=True,
-        null=True,
-    )
+    created_at = models.DateField()
+    results = models.JSONField(default=dict)
     advanced_user = models.ForeignKey(
         "users.AdvancedUser",
         on_delete=models.RESTRICT,
         db_column="advanceduserid",
+        null=True,
+        blank=True,
     )
     parameters = models.JSONField(default=dict, blank=True, db_column="parameters")
 
