@@ -15,7 +15,7 @@ from pollution_backend.measurements.api.serializers import (
 )
 from pollution_backend.measurements.api.serializers import MeasurementSerializer, MeasurementImportSerializer
 from pollution_backend.users.authentication import ApiKeyAuthentication
-from pollution_backend.measurements.models import Measurement
+from pollution_backend.measurements.models import Measurement, SystemLog
 from pollution_backend.selectors.measurements import get_aggregated_measurements
 from pollution_backend.selectors.measurements import get_measurements_for_sensor
 from pollution_backend.services.measurements import MeasurementImportService
@@ -88,6 +88,7 @@ class SystemLogViewSet(viewsets.ModelViewSet):
     from pollution_backend.measurements.models import SystemLog
     from pollution_backend.measurements.api.serializers import SystemLogSerializer
     
+    permission_classes = [IsAuthenticated]
     queryset = SystemLog.objects.all()
     serializer_class = SystemLogSerializer
     pagination_class = None
@@ -103,6 +104,13 @@ class SystemLogViewSet(viewsets.ModelViewSet):
         if station_id:
             queryset = queryset.filter(station_id=station_id)
             
+        if not self.request.user.is_staff:
+            queryset = queryset.filter(user=self.request.user)
+             
+        event_types = self.request.query_params.getlist('event_type')
+        if event_types:
+            queryset = queryset.filter(event_type__in=event_types)
+
         return queryset
 
 class MeasurementImportView(APIView):
@@ -134,12 +142,30 @@ class MeasurementImportView(APIView):
             service = MeasurementImportService(serializer.validated_data)
             service.process_import()
             
+            if hasattr(request, 'auth') and hasattr(request.auth, 'request_count'):
+                request.auth.request_count += 1
+                request.auth.save()
+
+            SystemLog.objects.create(
+                event_type="import_success",
+                message=f"Imported measurement for sensor {serializer.validated_data['sensor_id']} at {serializer.validated_data['timestamp']}",
+                log_level=SystemLog.SUCCESS,
+                sensor_id=serializer.validated_data['sensor_id'],
+                user=request.user
+            )
+
             return Response(
                 {"detail": "Data imported successfully."}, 
                 status=status.HTTP_201_CREATED
             )
 
         except Exception as e:
+            SystemLog.objects.create(
+                event_type="import_error",
+                message=str(e),
+                log_level=SystemLog.ERROR,
+                user=request.user if request.user.is_authenticated else None
+            )
             return Response(
                 {"detail": "Internal Server Error during processing."}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR

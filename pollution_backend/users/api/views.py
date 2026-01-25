@@ -56,3 +56,12 @@ class ApiKeyViewSet(viewsets.ModelViewSet):
         api_key.is_active = False
         api_key.save()
         return Response({'status': 'Key revoked'})
+
+    @action(detail=True, methods=['post'])
+    def expire(self, request, pk=None):
+        api_key = self.get_object()
+        from django.utils import timezone
+        from datetime import timedelta
+        api_key.expires_at = timezone.now() - timedelta(seconds=1)
+        api_key.save()
+        return Response({'status': 'Key expired'})

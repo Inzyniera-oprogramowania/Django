@@ -10,7 +10,7 @@ app_name = "measurements"
 router = DefaultRouter() if settings.DEBUG else SimpleRouter()
 
 router.register("measurements", MeasurementViewSet, basename="measurement")
-router.register("logs", SystemLogViewSet, basename="systemlog")
+router.register("system-logs", SystemLogViewSet, basename="systemlog")
 
 urlpatterns = [
     path("measurements/import/", MeasurementImportView.as_view(), name="measurement-import"),

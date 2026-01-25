@@ -127,6 +127,7 @@ class ApiKey(models.Model):
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     expires_at = models.DateTimeField(default=default_expiration)
+    request_count = models.IntegerField(default=0)
 
     def save(self, *args, **kwargs):
         if not self.key:
@@ -139,6 +140,7 @@ class ApiKey(models.Model):
 
     def refresh(self):
         self.expires_at = timezone.now() + timedelta(days=30)
+        self.request_count = 0
         self.save()
 
     def __str__(self):
