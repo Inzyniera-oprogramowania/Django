@@ -1,28 +1,26 @@
-from django.db.models import F
 from datetime import datetime
 from django.utils.decorators import method_decorator
-from django.db import transaction, IntegrityError
-from rest_framework import status
+from django.db import transaction
+from rest_framework import status, viewsets, mixins
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
-from rest_framework import mixins
-from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError   
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
-from pollution_backend.users.api.permissions import IsAdvancedUser 
 from pollution_backend.measurements.api.serializers import (
     AggregatedMeasurementSerializer,
-)
-from pollution_backend.measurements.api.serializers import MeasurementSerializer, MeasurementImportSerializer
+    MeasurementSerializer,
+    MeasurementImportSerializer,
+    SystemLogSerializer
+)   
 from pollution_backend.users.authentication import ApiKeyAuthentication
 from pollution_backend.measurements.models import Measurement, SystemLog
 from pollution_backend.selectors.measurements import get_aggregated_measurements
 from pollution_backend.selectors.measurements import get_measurements_for_sensor
-from pollution_backend.services.measurements import MeasurementImportService
 from drf_spectacular.utils import extend_schema
+from pollution_backend.tasks.measurements import import_measurements_task
 
 SENSOR_ID_REQUIRED = "sensor_id query parameter is required."
 
@@ -88,8 +86,6 @@ class MeasurementViewSet(
 
 
 class SystemLogViewSet(viewsets.ModelViewSet):
-    from pollution_backend.measurements.models import SystemLog
-    from pollution_backend.measurements.api.serializers import SystemLogSerializer
     
     permission_classes = [IsAuthenticated]
     queryset = SystemLog.objects.all()
@@ -127,12 +123,13 @@ class MeasurementImportView(APIView):
     @extend_schema(
         request=MeasurementImportSerializer,
         responses={
-            201: None, 
+            202: "Przetwarzanie w tle", 
             400: "Błąd parsowania JSON", 
             401: "Nieautoryzowany", 
-            422: "Błąd walidacji biznesowej"
+            422: "Błąd walidacji biznesowej",
+            429: "Przekroczono limit zapytań"
         },
-        description="Importuje pojedynczy pomiar lub paczkę danych."
+        description="Importuje pojedynczy pomiar lub paczkę danych (asynchronicznie)."
     )
     def post(self, request, *args, **kwargs):
         is_many = isinstance(request.data, list)
@@ -143,69 +140,21 @@ class MeasurementImportView(APIView):
                 {"code": "VALIDATION_ERROR", "errors": serializer.errors},
                 status=status.HTTP_422_UNPROCESSABLE_ENTITY
             )
+        
+        if hasattr(request, 'auth') and hasattr(request.auth, 'limit'):
+             if request.auth.request_count >= request.auth.limit:
+                 return Response(
+                    {"detail": "Limit zapytań wyczerpany."}, 
+                    status=status.HTTP_429_TOO_MANY_REQUESTS
+                )
 
-        try:
-            items = serializer.validated_data if is_many else [serializer.validated_data]
-            
-            for item_data in items:
-                service = MeasurementImportService(item_data)
-                service.process_import()
-            
-            if hasattr(request, 'auth') and hasattr(request.auth, 'request_count'):
-                updated = type(request.auth).objects.filter(
-                    pk=request.auth.pk, 
-                    request_count__lt=F('limit')
-                ).update(request_count=F('request_count') + 1)
-                
-                if updated == 0:
-                    return Response(
-                        {"detail": "Przekroczono limit zapytań dla tego klucza API"}, 
-                        status=status.HTTP_429_TOO_MANY_REQUESTS
-                    )
-                
-                request.auth.refresh_from_db()
+        valid_data = serializer.validated_data if is_many else [serializer.validated_data]
+        user_id = request.user.id if request.user.is_authenticated else None
+        api_key_id = request.auth.id if hasattr(request, 'auth') else None
+        
+        import_measurements_task.delay(valid_data, user_id, api_key_id)
 
-            if is_many:
-                msg = f"Batch imported {len(items)} measurements."
-                sensor_id = items[0]['sensor_id'] if items else None 
-            else:
-                msg = f"Imported measurement for sensor {items[0]['sensor_id']} at {items[0]['timestamp']}"
-                sensor_id = items[0]['sensor_id']
-
-            SystemLog.objects.create(
-                event_type="import_success",
-                message=msg,
-                log_level=SystemLog.SUCCESS,
-                sensor_id=sensor_id,
-                user=request.user
-            )
-
-            return Response(
-                {"detail": f"Successfully imported {len(items)} items."}, 
-                status=status.HTTP_201_CREATED
-            )
-
-        except IntegrityError:
-            msg = "Duplikat: Pomiar dla tego sensora z taką samą datą już istnieje."
-            SystemLog.objects.create(
-                event_type="import_error",
-                message=msg,
-                log_level=SystemLog.ERROR,
-                user=request.user if request.user.is_authenticated else None
-            )
-            return Response(
-                {"detail": msg}, 
-                status=status.HTTP_409_CONFLICT
-            )
-
-        except Exception as e:
-            SystemLog.objects.create(
-                event_type="import_error",
-                message=str(e),
-                log_level=SystemLog.ERROR,
-                user=request.user if request.user.is_authenticated else None
-            )
-            return Response(
-                {"detail": "Internal Server Error during processing."}, 
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+        return Response(
+            {"detail": "Dane przyjęte do przetwarzania.", "count": len(valid_data)}, 
+            status=status.HTTP_202_ACCEPTED
+        )
