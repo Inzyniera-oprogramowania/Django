@@ -1,3 +1,4 @@
+from django.db.models import F
 from datetime import datetime
 from django.utils.decorators import method_decorator
 from django.db import transaction, IntegrityError
@@ -151,8 +152,18 @@ class MeasurementImportView(APIView):
                 service.process_import()
             
             if hasattr(request, 'auth') and hasattr(request.auth, 'request_count'):
-                request.auth.request_count += 1
-                request.auth.save()
+                updated = type(request.auth).objects.filter(
+                    pk=request.auth.pk, 
+                    request_count__lt=F('limit')
+                ).update(request_count=F('request_count') + 1)
+                
+                if updated == 0:
+                    return Response(
+                        {"detail": "Przekroczono limit zapytań dla tego klucza API"}, 
+                        status=status.HTTP_429_TOO_MANY_REQUESTS
+                    )
+                
+                request.auth.refresh_from_db()
 
             if is_many:
                 msg = f"Batch imported {len(items)} measurements."
