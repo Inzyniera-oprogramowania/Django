@@ -36,9 +36,6 @@ services:
     command: python manage.py start_mqtt_listener
 
   postgres:
-    build:
-      context: .
-      dockerfile: ./compose/production/postgres/Dockerfile
     image: postgis/postgis:15-3.3
     container_name: pollution_backend_local_postgres
     volumes:

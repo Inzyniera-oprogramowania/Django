@@ -6,6 +6,9 @@ from django.contrib.auth.models import PermissionsMixin
 from django.contrib.gis.db import models as geomodels
 from django.db import models
 from django.utils import timezone
+import secrets
+from datetime import timedelta
+from django.conf import settings
 
 TESTING = "pytest" in sys.modules
 
@@ -38,7 +41,6 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     class Meta:
         db_table = '"User"'
-        managed = TESTING
 
     def __str__(self):
         return self.email
@@ -53,7 +55,6 @@ class Institution(models.Model):
 
     class Meta:
         db_table = "institution"
-        managed = TESTING
 
     def __str__(self):
         return self.name
@@ -78,7 +79,6 @@ class AdvancedUser(models.Model):
 
     class Meta:
         db_table = "advanceduser"
-        managed = TESTING
 
     def __str__(self):
         return f"Expert: {self.user.email}"
@@ -97,7 +97,48 @@ class Resident(models.Model):
 
     class Meta:
         db_table = "resident"
-        managed = TESTING
 
     def __str__(self):
         return f"Resident: {self.user.email}"
+
+
+def default_expiration():
+    return timezone.now() + timedelta(days=30)
+
+class ApiKey(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, 
+        on_delete=models.CASCADE, 
+        related_name='api_keys'
+    )
+    key = models.CharField(max_length=100, unique=True, db_index=True)
+    label = models.CharField(max_length=50, default="IoT Device")
+    station = models.ForeignKey(
+        "sensors.MonitoringStation", 
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="api_keys"
+    )
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField(default=default_expiration)
+    request_count = models.IntegerField(default=0)
+    limit = models.IntegerField(default=200)
+
+    def save(self, *args, **kwargs):
+        if not self.key:
+            self.key = secrets.token_urlsafe(40)
+        super().save(*args, **kwargs)
+
+    @property
+    def is_valid(self):
+        return self.is_active and self.expires_at > timezone.now()
+
+    def refresh(self):
+        self.expires_at = timezone.now() + timedelta(days=30)
+        self.request_count = 0
+        self.save()
+
+    def __str__(self):
+        return f"{self.key[:10]}... ({self.user.email})"

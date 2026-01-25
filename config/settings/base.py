@@ -6,6 +6,7 @@ import ssl
 from datetime import timedelta
 from pathlib import Path
 
+from corsheaders.defaults import default_headers
 import environ
 
 BASE_DIR = Path(__file__).resolve(strict=True).parent.parent.parent
@@ -334,7 +335,8 @@ CELERY_WORKER_HIJACK_ROOT_LOGGER = False
 # ------------------------------------------------------------------------------
 ACCOUNT_ALLOW_REGISTRATION = env.bool("DJANGO_ACCOUNT_ALLOW_REGISTRATION", True)
 # https://docs.allauth.org/en/latest/account/configuration.html
-ACCOUNT_LOGIN_METHODS = {"email"}
+ACCOUNT_AUTHENTICATION_METHOD = "email"
+ACCOUNT_USERNAME_REQUIRED = False
 # https://docs.allauth.org/en/latest/account/configuration.html
 ACCOUNT_SIGNUP_FIELDS = ["email", "password1", "password2"]
 # https://docs.allauth.org/en/latest/account/configuration.html
@@ -359,12 +361,25 @@ REST_FRAMEWORK = {
     ),
     "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle'
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': '100/day',
+        'user': '1000/day', 
+        'import_data': '10/minute',
+    },
 }
 
 # django-cors-headers - https://github.com/adamchainz/django-cors-headers#setup
 CORS_URLS_REGEX = r"^/(api|auth|users)/.*$"
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:4200",
+CORS_ALLOW_ALL_ORIGINS = True
+# CORS_ALLOWED_ORIGINS = [
+#     "http://localhost:4200",
+# ]
+CORS_ALLOW_HEADERS = list(default_headers) + [
+    'x-api-key',
 ]
 
 # By Default swagger ui is available only to admin user(s). You can change permission classes to change that
@@ -408,7 +423,6 @@ FORECAST_LAMBDA_FUNCTION_NAME = env('FORECAST_LAMBDA_FUNCTION_NAME')
 VALIDATION_LAMBDA_FUNCTION_NAME = env('VALIDATION_LAMBDA_FUNCTION_NAME')
 
 # MQTT
-# ------------------------------------------------------------------------------
 MQTT_BROKER_HOST = env("MQTT_BROKER_HOST", default="mosquitto")
 MQTT_BROKER_PORT = env.int("MQTT_BROKER_PORT", default=1883)
 MQTT_TOPICS = env.list("MQTT_TOPICS", default=["sensors/#"])

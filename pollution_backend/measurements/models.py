@@ -9,6 +9,7 @@ class Measurement(models.Model):
 
     class Meta:
         db_table = "measurement"
+        unique_together = ("time", "sensor_id")
 
 
 class SystemLog(models.Model):
@@ -30,6 +31,14 @@ class SystemLog(models.Model):
     log_level = models.CharField(max_length=20, choices=LOG_TYPE_CHOICES, default=INFO)
     sensor_id = models.IntegerField(null=True, blank=True, db_index=True)
     station_id = models.IntegerField(null=True, blank=True, db_index=True)
+    user = models.ForeignKey(
+        "users.User", 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True,
+        related_name="system_logs",
+        db_constraint=False
+    )
 
     class Meta:
         db_table = "systemlog"
