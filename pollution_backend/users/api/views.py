@@ -35,6 +35,7 @@ class InstitutionViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = InstitutionSerializer
     permission_classes = [AllowAny]
 
+
 class ApiKeyViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     serializer_class = ApiKeySerializer
