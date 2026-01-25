@@ -81,6 +81,32 @@ def broadcast_station_log(station_id, log):
         print(f"Failed to broadcast station log: {e}")
 
 
+def broadcast_sensor_log(sensor_id, log):
+    try:
+        from asgiref.sync import async_to_sync
+        from channels.layers import get_channel_layer
+        
+        channel_layer = get_channel_layer()
+        if channel_layer:
+            async_to_sync(channel_layer.group_send)(
+                f"sensor_{sensor_id}_status",
+                {
+                    "type": "system_log",
+                    "data": {
+                        "msg_type": "log",
+                        "id": log.id,
+                        "sensor_id": sensor_id,
+                        "event_type": log.event_type,
+                        "message": log.message,
+                        "log_level": log.log_level,
+                        "timestamp": log.timestamp.isoformat()
+                    }
+                }
+            )
+    except Exception as e:
+        print(f"Failed to broadcast sensor log: {e}")
+
+
 class DevicePagination(PageNumberPagination):
     page_size = 50
     page_size_query_param = "page_size"
@@ -116,6 +142,9 @@ class MonitoringStationViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
     def get_queryset(self):
+        if self.action != "list":
+            return MonitoringStation.objects.all().select_related("location")
+            
         queryset = get_active_stations()
         
         search = self.request.query_params.get("search")
@@ -137,7 +166,7 @@ class MonitoringStationViewSet(viewsets.ModelViewSet):
 
     def get_object(self):
         station_id = self.kwargs.get("pk")
-        return get_object_or_404(get_active_stations(), pk=station_id)
+        return get_object_or_404(MonitoringStation.objects.all(), pk=station_id)
 
     def get_serializer_class(self):
         if self.action == "create":
@@ -270,6 +299,11 @@ class SensorViewSet(viewsets.ModelViewSet):
         return SensorSerializer
 
     def get_queryset(self):
+        if self.action != "list":
+            return Sensor.objects.all().select_related(
+                "pollutant", "monitoring_station"
+            )
+
         queryset = get_active_sensors()
         
         station_id = self.request.query_params.get("station_id")
@@ -375,14 +409,16 @@ class SensorViewSet(viewsets.ModelViewSet):
             pollutant_name = sensor.pollutant.symbol if sensor.pollutant else "Unknown"
             
             log = SystemLog.objects.create(
+                sensor_id=sensor.id,
                 station_id=station.id,
                 event_type="SENSOR_ADDED",
                 message=f"Sensor {pollutant_name} (SN: {sensor.serial_number}) added to station",
                 log_level=SystemLog.INFO
             )
+            broadcast_sensor_log(sensor.id, log)
             broadcast_station_log(station.id, log)
         except Exception as e:
-            print(f"Failed to create station log: {e}")
+            print(f"Failed to create system log: {e}")
 
     def perform_update(self, serializer):
         sensor = serializer.save()
@@ -405,14 +441,14 @@ class SensorViewSet(viewsets.ModelViewSet):
                 level = SystemLog.INFO
             
             log = SystemLog.objects.create(
-                station_id=station.id,
+                sensor_id=sensor.id,
                 event_type="SENSOR_UPDATED",
                 message=message,
                 log_level=level
             )
-            broadcast_station_log(station.id, log)
+            broadcast_sensor_log(sensor.id, log)
         except Exception as e:
-            print(f"Failed to create station log: {e}")
+            print(f"Failed to create system log: {e}")
 
     def perform_destroy(self, instance):
         station = instance.monitoring_station
@@ -428,13 +464,15 @@ class SensorViewSet(viewsets.ModelViewSet):
             from pollution_backend.measurements.models import SystemLog
             log = SystemLog.objects.create(
                 station_id=station_id,
+                sensor_id=instance.id,
                 event_type="SENSOR_REMOVED",
                 message=f"Sensor {pollutant_name} (SN: {serial_number}) removed from station",
                 log_level=SystemLog.WARNING
             )
             broadcast_station_log(station_id, log)
+            broadcast_sensor_log(instance.id, log)
         except Exception as e:
-            print(f"Failed to create station log: {e}")
+            print(f"Failed to create system log: {e}")
 
 
 class PollutantViewSet(viewsets.ReadOnlyModelViewSet):
@@ -466,6 +504,7 @@ class DeviceViewSet(viewsets.ViewSet):
         
         device_type = request.query_params.get("type", "station") 
         search = request.query_params.get("search", "").strip()
+        id_filter = request.query_params.get("id", "").strip()
         pollutant_filter = request.query_params.get("pollutant", "").strip()
         is_active_param = request.query_params.get("is_active", "all")
         page = int(request.query_params.get("page", 1))
@@ -478,6 +517,7 @@ class DeviceViewSet(viewsets.ViewSet):
             "v": str(cache_version),
             "type": str(device_type),
             "search": str(search),
+            "id": str(id_filter),
             "pollutant": str(pollutant_filter),
             "is_active": str(is_active_param),
             "page": str(page),
@@ -520,6 +560,12 @@ class DeviceViewSet(viewsets.ViewSet):
                 stations = stations.filter(station_code__icontains=search) | stations.filter(
                     location__full_address__icontains=search
                 )
+            if id_filter:
+                try:
+                     stations = stations.filter(id=int(id_filter))
+                except ValueError:
+                     pass
+
             if pollutant_filter and pollutant_filter != "Wszystkie":
                 stations = stations.filter(sensor__pollutant__symbol=pollutant_filter).distinct()
             if is_active_filter is not None:
@@ -527,23 +573,37 @@ class DeviceViewSet(viewsets.ViewSet):
             
             stations = stations.prefetch_related("sensor_set")
 
+            # Fetch latest SystemLog times for stations
+            station_log_last_times = {}
+            try:
+                from pollution_backend.measurements.models import SystemLog
+                station_ids = [s.id for s in stations]
+                latest_logs = (
+                    SystemLog.objects
+                    .filter(station_id__in=station_ids)
+                    .values("station_id")
+                    .annotate(last_time=Max("timestamp"))
+                )
+                station_log_last_times = {l["station_id"]: l["last_time"] for l in latest_logs}
+            except Exception:
+                 pass
+
             for s in stations:
                 s_sensors = s.sensor_set.all()
                 
                 max_time = None
                 station_pollutants = set()
                 
+                # Add pollutants for display
                 for sensor in s_sensors:
                     if sensor.pollutant:
                         station_pollutants.add(sensor.pollutant.symbol)
-                        
-                    st = sensor_last_times.get(sensor.id)
-                    if st:
-                        if max_time is None or st > max_time:
-                            max_time = st
                 
+                # Consider ONLY station system logs (heartbeats etc.) for station activity
+                max_time = station_log_last_times.get(s.id)
+            
                 last_time_str = max_time.strftime("%Y-%m-%d %H:%M") if max_time else "-"
-                
+            
                 devices.append({
                     "id": s.id,
                     "station_code": s.station_code,
@@ -562,6 +622,13 @@ class DeviceViewSet(viewsets.ViewSet):
                 sensors = sensors.filter(is_active=is_active_filter)
             if pollutant_filter and pollutant_filter != "Wszystkie":
                 sensors = sensors.filter(pollutant__symbol=pollutant_filter)
+            
+            if id_filter:
+                try:
+                    sensors = sensors.filter(id=int(id_filter))
+                except ValueError:
+                    pass
+
             if search:
                 sensors = sensors.filter(serial_number__icontains=search) | sensors.filter(
                     sensor_type__icontains=search

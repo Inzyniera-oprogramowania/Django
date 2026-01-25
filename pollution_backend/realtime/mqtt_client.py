@@ -163,6 +163,8 @@ class MQTTClient:
                 # Route to appropriate handler
                 if topic_type == "status":
                     self._process_device_status(data)
+                elif topic_type == "heartbeat":
+                    self._process_station_heartbeat(station_code, data)
                 else:
                     # Existing measurement processing
                     logger.debug(
@@ -374,6 +376,34 @@ class MQTTClient:
         self.connect()
         logger.info("Starting MQTT client loop...")
         self.client.loop_forever()
+
+    def _process_station_heartbeat(self, station_code: str, data: dict[str, Any]) -> None:
+        try:
+            from pollution_backend.sensors.models import MonitoringStation
+            from pollution_backend.measurements.models import SystemLog
+            from pollution_backend.sensors.api.views import broadcast_station_log
+
+            try:
+                station = MonitoringStation.objects.get(station_code=station_code)
+            except MonitoringStation.DoesNotExist:
+                logger.warning("Station %s not found for heartbeat", station_code)
+                return
+
+            timestamp = timezone.now()
+            
+            log = SystemLog.objects.create(
+                station_id=station.id,
+                event_type="STATION_HEARTBEAT",
+                message=f"Station {station_code} is online (Heartbeat)",
+                log_level=SystemLog.INFO
+            )
+            
+            # Broadcast
+            broadcast_station_log(station.id, log)
+            logger.info("Processed heartbeat for station %s", station_code)
+
+        except Exception as e:
+            logger.exception("Failed to process station heartbeat: %s", e)
 
     def stop(self) -> None:
         """

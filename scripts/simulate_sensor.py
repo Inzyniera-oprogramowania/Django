@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 IoT Sensor Simulator for MQTT Testing.
 
@@ -9,16 +8,11 @@ Usage:
     python scripts/simulate_sensor.py
 
     # With custom parameters:
-    python scripts/simulate_sensor.py --host localhost --port 1883 \\
-        --station WAW001 --pollutant PM25 --sensor-id 1 --interval 5
+    python scripts/simulate_sensor.py --host localhost --port 1883 --station WAW001 --pollutant PM25 --sensor-id 1 --interval 5
 
 Requirements:
     pip install paho-mqtt
 """
-
-# TODO wszystko pobierane z bazy i cron, dodanie logów systemowych, zuzycia baterii, sygnał, uptime, reset?
-
-
 
 import argparse
 import json
@@ -82,24 +76,20 @@ def generate_measurement(
 _uptime_start = time.time()
 
 
-def generate_device_status(sensor_id: int) -> dict:
+def generate_device_status(sensor_id: int, drain_rate: float = 0.5) -> dict:
     """
     Generate a device status payload with battery, signal, and uptime.
 
     Args:
         sensor_id: ID of the sensor
+        drain_rate: Battery drain rate (%/min)
 
     Returns:
         Dictionary with device status data
     """
-    # Simulate battery drain (starts at 100%, decreases slowly)
     elapsed_minutes = (time.time() - _uptime_start) / 60
-    battery = max(5, 100 - int(elapsed_minutes * 0.5))  # Lose 0.5% per minute
-
-    # Simulate signal strength fluctuation
+    battery = max(0, 100 - int(elapsed_minutes * drain_rate))
     signal = random.randint(-80, -40)
-
-    # Calculate uptime in seconds
     uptime = int(time.time() - _uptime_start)
 
     return {
@@ -191,15 +181,16 @@ def main():
         help="Measurement unit (default: µg/m³)",
     )
     parser.add_argument(
-        "--status",
-        action="store_true",
-        help="Send device status messages instead of measurements",
-    )
-    parser.add_argument(
         "--status-interval",
         type=float,
         default=30.0,
         help="Status publish interval in seconds (default: 30.0)",
+    )
+    parser.add_argument(
+        "--drain-rate",
+        type=float,
+        default=5.0,
+        help="Battery drain rate in percent per minute (default: 5.0)",
     )
 
     args = parser.parse_args()
@@ -248,9 +239,22 @@ def main():
     sent = 0
     try:
         while args.count == 0 or sent < args.count:
+            elapsed_minutes = (time.time() - _uptime_start) / 60
+            current_battery = max(0, 100 - int(elapsed_minutes * args.drain_rate))
+            
+            if current_battery <= 0:
+                if args.status:
+                     message = generate_device_status(sensor_id=args.sensor_id, drain_rate=args.drain_rate)
+                     payload = json.dumps(message)
+                     client.publish(topic, payload, qos=1)
+                     logger.warning("Battery Critical (0%). Sensor shutting down.")
+                else:
+                     logger.warning("Battery Critical (0%). Sensor shutting down (no status sent).")
+                break
+
             if args.status:
                 # Device status mode
-                message = generate_device_status(sensor_id=args.sensor_id)
+                message = generate_device_status(sensor_id=args.sensor_id, drain_rate=args.drain_rate)
                 payload = json.dumps(message)
                 result = client.publish(topic, payload, qos=1)
                 if result.rc == mqtt.MQTT_ERR_SUCCESS:
@@ -274,10 +278,11 @@ def main():
                 result = client.publish(topic, payload, qos=1)
                 if result.rc == mqtt.MQTT_ERR_SUCCESS:
                     logger.info(
-                        "Published: topic=%s, value=%.2f %s",
+                        "Published: topic=%s, value=%.2f %s (Battery: %d%%)",
                         topic,
                         measurement["value"],
                         measurement["unit"],
+                        current_battery
                     )
                     sent += 1
                 else:
