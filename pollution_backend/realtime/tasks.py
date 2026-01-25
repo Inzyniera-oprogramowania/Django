@@ -12,7 +12,7 @@ from datetime import datetime
 from celery import shared_task
 from django.utils import timezone
 
-from pollution_backend.sensors.models import AnomalyLog, QualityNorm, Sensor
+from pollution_backend.sensors.models import AnomalyLog, AnomalyRule, Sensor
 
 logger = logging.getLogger(__name__)
 
@@ -67,69 +67,71 @@ def check_anomaly(
 
         pollutant = sensor.pollutant
 
-        # Get applicable quality norms for this pollutant
-        today = timezone.now().date()
-        quality_norms = QualityNorm.objects.filter(
+        # Get applicable anomaly rule for this pollutant
+        rule = AnomalyRule.objects.filter(
             pollutant=pollutant,
-        ).filter(
-            # Norm is valid if:
-            # - valid_from is null or <= today
-            # - valid_to is null or >= today
-            valid_from__lte=today,
-        ).filter(
-            valid_to__gte=today,
-        ) | QualityNorm.objects.filter(
-            pollutant=pollutant,
-            valid_from__isnull=True,
-        ) | QualityNorm.objects.filter(
-            pollutant=pollutant,
-            valid_to__isnull=True,
-        )
+            is_enabled=True,
+        ).first()
 
-        if not quality_norms.exists():
+        if not rule:
             logger.debug(
-                "No quality norms found for pollutant %s",
+                "No detection rule found/enabled for pollutant %s",
                 pollutant.symbol,
             )
             return {
                 "is_anomaly": False,
                 "anomaly_id": None,
-                "message": f"No quality norms for {pollutant.symbol}",
+                "message": f"No rule for {pollutant.symbol}",
             }
 
-        # Check against all applicable norms
-        for norm in quality_norms:
-            if value > norm.threshold_value:
-                # Parse timestamp
-                detected_at = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
-                if timezone.is_naive(detected_at):
-                    detected_at = timezone.make_aware(detected_at)
+        is_anomaly = False
+        anomaly_desc = ""
+        anomaly_severity = "warning"
 
-                # Create anomaly log entry
-                anomaly = AnomalyLog.objects.create(
-                    description=(
-                        f"Measurement value {value:.2f} {norm.unit} exceeds "
-                        f"{norm.norm_type} threshold of {norm.threshold_value:.2f} {norm.unit} "
-                        f"for {pollutant.name}"
-                    ),
-                    detected_at=detected_at,
-                    status="detected",
-                    sensor=sensor,
-                )
+        # Check critical threshold
+        if value > rule.critical_threshold:
+            is_anomaly = True
+            anomaly_severity = "critical"
+            anomaly_desc = (
+                f"CRITICAL: Value {value:.2f} exceeds critical threshold "
+                f"of {rule.critical_threshold:.2f} for {pollutant.symbol}"
+            )
+        # Check warning threshold
+        elif value > rule.warning_threshold:
+            is_anomaly = True
+            anomaly_severity = "warning"
+            anomaly_desc = (
+                f"WARNING: Value {value:.2f} exceeds warning threshold "
+                f"of {rule.warning_threshold:.2f} for {pollutant.symbol}"
+            )
 
-                logger.warning(
-                    "Anomaly detected: sensor_id=%d, value=%.2f, threshold=%.2f, norm_type=%s",
-                    sensor_id,
-                    value,
-                    norm.threshold_value,
-                    norm.norm_type,
-                )
+        if is_anomaly:
+            # Parse timestamp
+            detected_at = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+            if timezone.is_naive(detected_at):
+                detected_at = timezone.make_aware(detected_at)
 
-                return {
-                    "is_anomaly": True,
-                    "anomaly_id": anomaly.id,
-                    "message": f"Threshold exceeded: {value:.2f} > {norm.threshold_value:.2f}",
-                }
+            # Create anomaly log entry
+            anomaly = AnomalyLog.objects.create(
+                description=anomaly_desc,
+                detected_at=detected_at,
+                status="pending",  # Correct status
+                severity=anomaly_severity,
+                sensor=sensor,
+            )
+
+            logger.warning(
+                "Anomaly detected: sensor_id=%d, value=%.2f, severity=%s",
+                sensor_id,
+                value,
+                anomaly_severity,
+            )
+
+            return {
+                "is_anomaly": True,
+                "anomaly_id": anomaly.id,
+                "message": anomaly_desc,
+            }
 
         logger.debug(
             "No anomaly detected: sensor_id=%d, value=%.2f within thresholds",

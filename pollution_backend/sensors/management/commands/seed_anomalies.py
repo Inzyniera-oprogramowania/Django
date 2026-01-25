@@ -30,7 +30,7 @@ class Command(BaseCommand):
             self.stdout.write(self.style.ERROR("No active sensors found!"))
             return
 
-        statuses = ["detected", "analyzing", "confirmed", "resolved", "rejected"]
+        statuses = ["pending", "confirmed", "dismissed"]
         descriptions = [
             "Nagły wzrost PM10 - przekroczony próg bezpieczeństwa",
             "Wartość PM2.5 znacznie powyżej normy dziennej",

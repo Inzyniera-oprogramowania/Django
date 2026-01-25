@@ -20,6 +20,8 @@ class Report(models.Model):
         "users.AdvancedUser",
         on_delete=models.RESTRICT,
         db_column="advanceduserid",
+        null=True,
+        blank=True,
     )
     parameters = models.JSONField(default=dict, blank=True, db_column="parameters")
 
