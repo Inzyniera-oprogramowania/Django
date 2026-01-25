@@ -6,6 +6,7 @@ import ssl
 from datetime import timedelta
 from pathlib import Path
 
+from corsheaders.defaults import default_headers
 import environ
 
 BASE_DIR = Path(__file__).resolve(strict=True).parent.parent.parent
@@ -360,12 +361,25 @@ REST_FRAMEWORK = {
     ),
     "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle'
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': '100/day',
+        'user': '1000/day', 
+        'import_data': '10/minute',
+    },
 }
 
 # django-cors-headers - https://github.com/adamchainz/django-cors-headers#setup
 CORS_URLS_REGEX = r"^/(api|auth|users)/.*$"
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:4200",
+CORS_ALLOW_ALL_ORIGINS = True
+# CORS_ALLOWED_ORIGINS = [
+#     "http://localhost:4200",
+# ]
+CORS_ALLOW_HEADERS = list(default_headers) + [
+    'x-api-key',
 ]
 
 # By Default swagger ui is available only to admin user(s). You can change permission classes to change that
