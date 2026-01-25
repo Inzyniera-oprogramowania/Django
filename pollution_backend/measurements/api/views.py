@@ -108,7 +108,8 @@ class SystemLogViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(station_id=station_id)
             
         if not self.request.user.is_staff:
-            queryset = queryset.filter(user=self.request.user)
+            from django.db.models import Q
+            queryset = queryset.filter(Q(user=self.request.user) | Q(user__isnull=True))
              
         event_types = self.request.query_params.getlist('event_type')
         if event_types:
