@@ -8,7 +8,13 @@ def get_aggregated_device_list(filters: dict):
     search = filters.get("search", "").strip()
     id_filter = filters.get("id")
     pollutant_filter = filters.get("pollutant")
-    is_active_param = filters.get("is_active") 
+    raw_active = filters.get("is_active")
+    is_active_bool = None
+
+    if str(raw_active).lower() == 'true':
+        is_active_bool = True
+    elif str(raw_active).lower() == 'false':
+        is_active_bool = False
 
     devices = []
 
@@ -35,8 +41,8 @@ def get_aggregated_device_list(filters: dict):
                 pass
         if pollutant_filter and pollutant_filter != "Wszystkie":
             stations = stations.filter(sensor__pollutant__symbol=pollutant_filter).distinct()
-        if is_active_param is not None:
-            stations = stations.filter(is_active=is_active_param)
+        if is_active_bool is not None:
+            stations = stations.filter(is_active=is_active_bool)
             
         stations = stations.prefetch_related("sensor_set__pollutant", "location")
 
@@ -69,11 +75,11 @@ def get_aggregated_device_list(filters: dict):
             })
 
     if device_type in ("sensor", "all"):
-        sensors = get_active_sensors() if is_active_param is None or is_active_param else Sensor.objects.all()
+        sensors = get_active_sensors() if is_active_bool is None or is_active_bool else Sensor.objects.all()
         sensors = sensors.select_related("pollutant", "monitoring_station", "monitoring_station__location")
         
-        if is_active_param is not None:
-            sensors = sensors.filter(is_active=is_active_param)
+        if is_active_bool is not None:
+            sensors = sensors.filter(is_active=is_active_bool)
         if pollutant_filter and pollutant_filter != "Wszystkie":
             sensors = sensors.filter(pollutant__symbol=pollutant_filter)
         if id_filter:

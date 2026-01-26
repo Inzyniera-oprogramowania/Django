@@ -5,7 +5,7 @@ from pollution_backend.sensors.api.serializers import DeviceSerializer
 from pollution_backend.selectors.devices import get_aggregated_device_list
 from pollution_backend.services.redis_cache import DeviceListCache
 
-class DeviceViewSet(viewsets.ViewSet):
+class DeviceViewSet(viewsets.GenericViewSet):
     pagination_class = DevicePagination
 
     def list(self, request):

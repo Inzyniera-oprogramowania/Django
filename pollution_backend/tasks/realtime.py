@@ -1,11 +1,3 @@
-"""
-Celery tasks for real-time data processing.
-
-This module contains Celery tasks for:
-- Anomaly detection in sensor measurements
-- Alert generation when thresholds are exceeded
-"""
-
 import logging
 from datetime import datetime
 
@@ -29,30 +21,7 @@ def check_anomaly(
     value: float,
     timestamp: str,
 ) -> dict[str, bool | str | None]:
-    """
-    Check if a measurement exceeds quality norm thresholds and log anomalies.
-
-    This task compares the measurement value against the applicable QualityNorm
-    for the sensor's pollutant. If the value exceeds the threshold, an AnomalyLog
-    entry is created.
-
-    Args:
-        sensor_id: ID of the sensor that produced the measurement
-        value: The measured value
-        timestamp: ISO 8601 timestamp of the measurement
-
-    Returns:
-        Dictionary with:
-            - is_anomaly: bool indicating if threshold was exceeded
-            - anomaly_id: ID of created AnomalyLog (if anomaly detected)
-            - message: Description of the result
-
-    Business Rules:
-        - RB4: System must automatically detect anomalies in measurement data
-               and generate appropriate alerts
-    """
     try:
-        # Get the sensor and its pollutant
         try:
             sensor = Sensor.objects.select_related("pollutant", "monitoring_station").get(
                 id=sensor_id
@@ -67,7 +36,6 @@ def check_anomaly(
 
         pollutant = sensor.pollutant
 
-        # Get applicable anomaly rule for this pollutant
         rule = AnomalyRule.objects.filter(
             pollutant=pollutant,
             is_enabled=True,
@@ -88,7 +56,6 @@ def check_anomaly(
         anomaly_desc = ""
         anomaly_severity = "warning"
 
-        # Check critical threshold
         if value > rule.critical_threshold:
             is_anomaly = True
             anomaly_severity = "critical"
@@ -96,7 +63,6 @@ def check_anomaly(
                 f"CRITICAL: Value {value:.2f} exceeds critical threshold "
                 f"of {rule.critical_threshold:.2f} for {pollutant.symbol}"
             )
-        # Check warning threshold
         elif value > rule.warning_threshold:
             is_anomaly = True
             anomaly_severity = "warning"
@@ -106,16 +72,14 @@ def check_anomaly(
             )
 
         if is_anomaly:
-            # Parse timestamp
             detected_at = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
             if timezone.is_naive(detected_at):
                 detected_at = timezone.make_aware(detected_at)
 
-            # Create anomaly log entry
             anomaly = AnomalyLog.objects.create(
                 description=anomaly_desc,
                 detected_at=detected_at,
-                status="pending",  # Correct status
+                status="pending",  
                 severity=anomaly_severity,
                 sensor=sensor,
             )
