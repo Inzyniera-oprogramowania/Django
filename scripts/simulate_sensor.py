@@ -44,6 +44,7 @@ def generate_measurement(
     sensor_id: int,
     pollutant: str,
     unit: str = "µg/m³",
+    range_max: float = None,
 ) -> dict:
     """
     Generate a random measurement payload.
@@ -52,11 +53,16 @@ def generate_measurement(
         sensor_id: ID of the sensor
         pollutant: Pollutant symbol (e.g., PM25, NO2)
         unit: Measurement unit
+        range_max: Optional upper bound for measurement values
 
     Returns:
         Dictionary with measurement data
     """
-    value_range = POLLUTANT_RANGES.get(pollutant, (0.0, 100.0))
+    if range_max is not None:
+        value_range = (0.0, float(range_max))
+    else:
+        value_range = POLLUTANT_RANGES.get(pollutant, (0.0, 100.0))
+        
     value = round(random.uniform(*value_range), 2)
 
     # Occasionally generate anomalous values (10% chance)
@@ -118,12 +124,26 @@ def on_message(client, userdata, msg):
     """Handle incoming messages."""
     global _uptime_start
     try:
-        payload = json.loads(msg.payload.decode())
-        if payload.get("command") == "RESET":
-            logger.info("Received RESET command. Resetting uptime and battery.")
-            _uptime_start = time.time()
+        payload_str = msg.payload.decode()
+        logger.info("MQTT RX [Topic: %s]: %s", msg.topic, payload_str)
+        payload = json.loads(payload_str)
+        
+        command = payload.get("command")
+        cmd_sensor_id = payload.get("sensor_id")
+        
+        if command == "RESET":
+            my_id = userdata.get('sensor_id') if isinstance(userdata, dict) else None
+            
+            if cmd_sensor_id is None or str(cmd_sensor_id) == str(my_id):
+                logger.warning("!!! RECEIVED RESET SIGNAL - Resetting Uptime & Battery !!!")
+                _uptime_start = time.time()
+            else:
+                logger.info("Reset ignored (Target ID %s != My ID %s)", cmd_sensor_id, my_id)
     except Exception as e:
         logger.error("Failed to process message: %s", e)
+
+def on_subscribe(client, userdata, mid, reason_codes, properties):
+    logger.info("Subscribed successfully (mid=%d)", mid)
 
 
 def main():
@@ -131,10 +151,7 @@ def main():
     parser = argparse.ArgumentParser(
         description="Simulate an IoT sensor publishing MQTT messages",
     )
-    # ... (skipping arguments, assuming they are unchanged until we modify main)
-    # Actually, replacement content must match precisely.
-    # I should target a smaller block inside main or define on_message before main.
-    # Let's define on_message before main first.
+
     parser.add_argument(
         "--host",
         default="localhost",
@@ -176,6 +193,11 @@ def main():
         help="Number of messages to send (0 = infinite, default: 0)",
     )
     parser.add_argument(
+        "--status",
+        action="store_true",
+        help="Publish device status instead of measurements",
+    )
+    parser.add_argument(
         "--unit",
         default="µg/m³",
         help="Measurement unit (default: µg/m³)",
@@ -192,6 +214,11 @@ def main():
         default=5.0,
         help="Battery drain rate in percent per minute (default: 5.0)",
     )
+    parser.add_argument(
+        "--range-max",
+        type=float,
+        help="Maximum measurement value range (0 to range-max)",
+    )
 
     args = parser.parse_args()
 
@@ -205,13 +232,15 @@ def main():
     suffix = "_status" if args.status else "_meas"
     client = mqtt.Client(
         client_id=f"simulator_{args.sensor_id}{suffix}",
+        userdata={'sensor_id': args.sensor_id},
         callback_api_version=mqtt.CallbackAPIVersion.VERSION2,
     )
     client.on_connect = on_connect
     client.on_publish = on_publish
     client.on_message = on_message
+    client.on_subscribe = on_subscribe
 
-    logger.info("Connecting to %s:%d...", args.host, args.port)
+    logger.info("Connecting to %s:%d (Sensor ID: %s)...", args.host, args.port, args.sensor_id)
     try:
         client.connect(args.host, args.port, keepalive=60)
     except Exception as e:
@@ -273,6 +302,7 @@ def main():
                     sensor_id=args.sensor_id,
                     pollutant=args.pollutant,
                     unit=args.unit,
+                    range_max=args.range_max,
                 )
                 payload = json.dumps(measurement)
                 result = client.publish(topic, payload, qos=1)

@@ -102,6 +102,14 @@ class MQTTProcessingService:
             },
         )
 
+        log = SystemLog.objects.create(
+            event_type="SENSOR_STATUS",
+            message=f"Sensor {sensor_id} status updated (Battery: {battery}%, Signal: {rssi} dBm)",
+            log_level=SystemLog.INFO,
+            sensor_id=sensor_id
+        )
+        broadcast_sensor_log(sensor_id, log)
+
         broadcast_sensor_status(sensor_id, {
             "msg_type": "status",
             "sensor_id": sensor_id,

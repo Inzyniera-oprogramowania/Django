@@ -62,7 +62,7 @@ def get_aggregated_device_list(filters: dict):
             pollutants = sorted(list({sensor.pollutant.symbol for sensor in s_sensors if sensor.pollutant}))
             
             max_time = station_log_last_times.get(s.id)
-            last_time_str = max_time.strftime("%Y-%m-%d %H:%M") if max_time else "-"
+            last_time_str = max_time.isoformat() if max_time else "-"
             
             devices.append({
                 "id": s.id,
@@ -75,8 +75,7 @@ def get_aggregated_device_list(filters: dict):
             })
 
     if device_type in ("sensor", "all"):
-        sensors = get_active_sensors() if is_active_bool is None or is_active_bool else Sensor.objects.all()
-        sensors = sensors.select_related("pollutant", "monitoring_station", "monitoring_station__location")
+        sensors = Sensor.objects.all().select_related("pollutant", "monitoring_station", "monitoring_station__location")
         
         if is_active_bool is not None:
             sensors = sensors.filter(is_active=is_active_bool)
@@ -94,7 +93,7 @@ def get_aggregated_device_list(filters: dict):
         
         for s in sensors:
             last_time = sensor_last_times.get(s.id)
-            last_time_str = last_time.strftime("%Y-%m-%d %H:%M") if last_time else "-"
+            last_time_str = last_time.isoformat() if last_time else "-"
             
             devices.append({
                 "id": s.id,

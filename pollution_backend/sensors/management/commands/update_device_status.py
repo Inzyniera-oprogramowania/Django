@@ -41,6 +41,8 @@ class Command(BaseCommand):
         now = timezone.now()
         threshold = now - timedelta(hours=timeout_hours)
         
+        from pollution_backend.realtime.sensors import broadcast_sensor_log, broadcast_station_log
+
         sensors = Sensor.objects.all()
         for sensor in sensors:
             latest_meas = Measurement.objects.using("timeseries").filter(sensor_id=sensor.id).aggregate(latest=Max("time"))["latest"]
@@ -63,6 +65,16 @@ class Command(BaseCommand):
                 sensor.is_active = is_active
                 sensor.save()
 
+                event = "DEVICE_ONLINE" if is_active else "DEVICE_OFFLINE"
+                msg = f"Sensor {sensor.id} is now {'ACTIVE' if is_active else 'INACTIVE'} (Last activity: {latest_activity})"
+                log = SystemLog.objects.create(
+                    event_type=event,
+                    message=msg,
+                    log_level=SystemLog.INFO if is_active else SystemLog.ERROR,
+                    sensor_id=sensor.id
+                )
+                broadcast_sensor_log(sensor.id, log)
+
         stations = MonitoringStation.objects.all()
         for station in stations:
             latest_activity = SystemLog.objects.filter(station_id=station.id).aggregate(latest=Max("timestamp"))["latest"]
@@ -75,3 +87,13 @@ class Command(BaseCommand):
                 self.stdout.write(f"Updating Station {station.station_code} active state: {station.is_active} -> {is_active}")
                 station.is_active = is_active
                 station.save()
+
+                event = "STATION_ONLINE" if is_active else "STATION_OFFLINE"
+                msg = f"Station {station.station_code} is now {'ACTIVE' if is_active else 'INACTIVE'} (Last activity: {latest_activity})"
+                log = SystemLog.objects.create(
+                    event_type=event,
+                    message=msg,
+                    log_level=SystemLog.INFO if is_active else SystemLog.ERROR,
+                    station_id=station.id
+                )
+                broadcast_station_log(station.id, log)

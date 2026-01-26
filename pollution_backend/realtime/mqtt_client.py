@@ -77,6 +77,9 @@ class MQTTClient:
                 elif msg_type == "heartbeat":
                     MQTTProcessingService.process_station_heartbeat(station_code, data)
                 
+                elif msg_type == "command":
+                    pass
+                
                 else:
                     data['station_code'] = station_code 
                     MQTTProcessingService.process_measurement(data)

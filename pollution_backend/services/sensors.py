@@ -14,8 +14,14 @@ class SensorService:
     def reset_sensor(sensor):
         status, _ = DeviceStatus.objects.get_or_create(sensor=sensor)
         status.uptime_seconds = 0
+        status.battery_percent = 100
         status.last_reset_at = timezone.now()
         status.save()
+
+        if not sensor.is_active:
+            sensor.is_active = True
+            sensor.save()
+            DeviceListCache.invalidate()
 
         broadcast_sensor_status(sensor.id, {
             "sensor_id": sensor.id,
@@ -33,7 +39,9 @@ class SensorService:
         )
 
         if sensor.monitoring_station:
-            publish_mqtt_command(sensor.monitoring_station.station_code, '{"command": "RESET"}')
+            command = {"command": "RESET", "sensor_id": sensor.id}
+            import json
+            publish_mqtt_command(sensor.monitoring_station.station_code, json.dumps(command))
 
         return status
 

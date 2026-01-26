@@ -6,5 +6,5 @@ class IsAdvancedUser(permissions.BasePermission):
         return bool(
             request.user and 
             request.user.is_authenticated and 
-            hasattr(request.user, 'advanced_profile')
+            (request.user.is_staff or hasattr(request.user, 'advanced_profile'))
         )

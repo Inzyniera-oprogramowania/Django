@@ -90,3 +90,17 @@ services:
     ports:
       - '1883:1883'
       - '9001:9001'
+
+  activity_monitor:
+    <<: *django
+    container_name: pollution_backend_local_activity_monitor
+    depends_on:
+      - postgres
+      - redis
+    ports: []
+    env_file:
+      - ./.envs/.local/.django
+      - ./.envs/.local/.postgres
+    environment:
+      - PYTHONUNBUFFERED=1
+    command: python manage.py update_device_status --interval 60 --timeout 1
