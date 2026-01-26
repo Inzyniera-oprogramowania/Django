@@ -22,7 +22,6 @@ from pollution_backend.measurements.api.serializers import (
 from pollution_backend.users.authentication import ApiKeyAuthentication
 from pollution_backend.measurements.models import Measurement, SystemLog
 from pollution_backend.selectors.measurements import get_aggregated_measurements
-from pollution_backend.selectors.measurements import get_measurements_for_sensor
 from drf_spectacular.utils import extend_schema
 from pollution_backend.tasks.measurements import import_measurements_task
 from pollution_backend.users.models import ApiKey

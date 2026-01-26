@@ -10,6 +10,7 @@ from pollution_backend.users.models import Institution
 from .serializers import UserSerializer, InstitutionSerializer
 from django.utils import timezone
 from datetime import timedelta
+from pollution_backend.users.api.permissions import IsAdvancedUser
 
 User = get_user_model()
 
@@ -37,7 +38,7 @@ class InstitutionViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 class ApiKeyViewSet(viewsets.ModelViewSet):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsAdvancedUser]
     serializer_class = ApiKeySerializer
     pagination_class = None
 
