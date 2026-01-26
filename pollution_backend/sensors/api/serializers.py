@@ -44,7 +44,6 @@ class LocationSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
-# Monitoring station z geom dla mapy
 class MonitoringStationGeoSerializer(GeoFeatureModelSerializer):
     class Meta:
         model = MonitoringStation
@@ -62,8 +61,6 @@ class MonitoringStationFlatSerializer(serializers.ModelSerializer):
         fields = ["id", "station_code", "owner", "is_active", "lat", "lon", "address"]
 
 
-
-# Dokladny serializer monitoring station z sensorami i lokalizacja
 class MonitoringStationDetailSerializer(serializers.ModelSerializer):
     sensors = SensorSerializer(many=True, read_only=True, source="sensor_set")
 
@@ -199,8 +196,6 @@ class GlobalAnomalyConfigSerializer(serializers.ModelSerializer):
         fields = ["id", "missing_data_timeout_minutes"]
         read_only_fields = ["id"]
 
-
-# Serializers for Dropdowns (Performance Optimization)
 
 class StationDropdownSerializer(serializers.ModelSerializer):
     address = serializers.CharField(source="location.full_address", read_only=True)

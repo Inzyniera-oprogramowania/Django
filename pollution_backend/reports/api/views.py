@@ -34,7 +34,7 @@ class MeasurementExportView(APIView):
         if result is None:
             return Response({"detail": "No data found for the given filters."}, status=status.HTTP_404_NOT_FOUND)
         
-        content = result['content']
+        #content = result['content']
         filename = result['filename']
         checksum = result['checksum']
         total_records = result['total_records']

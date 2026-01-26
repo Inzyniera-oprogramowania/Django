@@ -1,17 +1,20 @@
 from pollution_backend.measurements.models import Measurement
-import traceback
 from pollution_backend.sensors.models import Sensor
+from pollution_backend.reports.models import Report
+from django.core.files.base import ContentFile
+import traceback
 import json
 import io
 import hashlib
 import csv
 from xml.etree.ElementTree import Element, SubElement, tostring
+from itertools import groupby
+from operator import itemgetter
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph
-from reportlab.lib.styles import getSampleStyleSheet
-from django.core.files.base import ContentFile
-from pollution_backend.reports.models import Report
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.enums import TA_CENTER, TA_LEFT
 
 class ExportService:
     def __init__(self, validate_data, user):
@@ -44,42 +47,48 @@ class ExportService:
         target_sensor_ids = list(self.sensor_map.keys())
         
         queryset = Measurement.objects.filter(
-            time__range = (self.data['date_from'], self.data['date_to']),
+            time__range=(self.data['date_from'], self.data['date_to']),
             sensor_id__in=target_sensor_ids
-        ).order_by('time')
-  
+        )
 
         return queryset
     
     def generate_file(self):
         file_format = self.data['file_format']
-
-        measurements = []
+        measurements_data = []
 
         for measurement in self.queryset:
             metadata = self.sensor_map.get(measurement.sensor_id)
-            measurements.append({
-                    "time": measurement.time.isoformat(),
-                    "value": measurement.value,
-                    "unit": measurement.unit,
-                    "station": metadata['station'],     
-                    "pollutant": metadata['pollutant']  
-                })
+            
+            if not metadata:
+                continue
 
-        if not measurements:
+            measurements_data.append({
+                "time_obj": measurement.time,
+                "time": measurement.time.isoformat(),
+                "display_time": measurement.time.strftime("%Y-%m-%d %H:%M"),
+                "value": measurement.value,
+                "unit": measurement.unit,
+                "station": metadata['station'],     
+                "pollutant": metadata['pollutant']  
+            })
+
+        if not measurements_data:
             return None
+
+        measurements_data.sort(key=itemgetter('station', 'pollutant', 'time_obj'))
         
         content = ""
         content_type = ""
 
         if file_format == 'csv':
-            content, content_type = self._generate_csv(measurements)
+            content, content_type = self._generate_csv(measurements_data)
         elif file_format == 'json':
-            content, content_type = self._generate_json(measurements)
+            content, content_type = self._generate_json(measurements_data)
         elif file_format == 'xml':
-            content, content_type = self._generate_xml(measurements)
+            content, content_type = self._generate_xml(measurements_data)
         elif file_format == 'pdf':
-            content, content_type = self._generate_pdf(measurements)
+            content, content_type = self._generate_pdf(measurements_data)
         else:
             raise ValueError("Unsupported file format")
         
@@ -87,13 +96,14 @@ class ExportService:
             checksum = hashlib.sha256(content.encode('utf-8')).hexdigest()
         else:
             checksum = hashlib.sha256(content).hexdigest()
+
         date_from_str = self.data['date_from'].strftime('%Y-%m-%d')
         date_to_str = self.data['date_to'].strftime('%Y-%m-%d')
         
         filename = f"export_{date_from_str}_{date_to_str}.{file_format}"
 
-        total_records = len(measurements)
-        preview_data = measurements[:5]
+        total_records = len(measurements_data)
+        preview_data = [{k: v for k, v in m.items() if k != 'time_obj'} for m in measurements_data[:5]]
 
         return content, content_type, filename, checksum, total_records, preview_data
 
@@ -111,22 +121,27 @@ class ExportService:
             file_content = ContentFile(content)
 
         try:
-            adv_user = self.user.advanced_profile
-            
+            if hasattr(self.user, 'advanced_profile'):
+                adv_user = self.user.advanced_profile
+            else:
+                adv_user = None 
+
             report_params = self.data.copy()
             if 'date_from' in report_params:
                 report_params['date_from'] = report_params['date_from'].strftime('%Y-%m-%d')
             if 'date_to' in report_params:
                 report_params['date_to'] = report_params['date_to'].strftime('%Y-%m-%d')
 
-            report = Report.objects.create(
-                title=f"Export {self.data['file_format'].upper()} - {filename}",
-                advanced_user=adv_user,
-                parameters=report_params
-            )
-            
-            report.file.save(filename, file_content)
-            report.save()
+            report = None
+            if adv_user:
+                report = Report.objects.create(
+                    title=f"Export {self.data['file_format'].upper()} - {filename}",
+                    advanced_user=adv_user,
+                    parameters=report_params
+                )
+                report.file.save(filename, file_content)
+                report.save()
+
         except Exception as e:
             print(f"ERROR: Database save failed: {e}")
             traceback.print_exc()
@@ -144,60 +159,103 @@ class ExportService:
 
     def _generate_csv(self, measurements):
         output = io.StringIO()
-        writer = csv.DictWriter(output, fieldnames=measurements[0].keys())
+        fieldnames = ['time', 'value', 'unit', 'station', 'pollutant']
+        writer = csv.DictWriter(output, fieldnames=fieldnames, extrasaction='ignore')
         writer.writeheader()
         writer.writerows(measurements)
         content = output.getvalue()
-        content_type = "text/csv"
-        return content, content_type
+        return content, "text/csv"
     
     def _generate_json(self, measurements):
-        content = json.dumps(measurements, indent=4, ensure_ascii=False)
-        content_type = "application/json"
-        return content, content_type
+        clean_data = [{k: v for k, v in m.items() if k not in ['display_time', 'time_obj']} for m in measurements]
+        content = json.dumps(clean_data, indent=4, ensure_ascii=False)
+        return content, "application/json"
 
     def _generate_xml(self, measurements):
         root = Element("measurements")
         for measurement in measurements:
             item = SubElement(root, "measurement")
-            for key, val in measurement.items():
+            for key in ['time', 'value', 'unit', 'station', 'pollutant']:
                 child = SubElement(item, key)
-                child.text = str(val)
+                child.text = str(measurement.get(key, ''))
 
         content = tostring(root, encoding="unicode")
-        content_type = "application/xml"
-        return content, content_type
+        return content, "application/xml"
 
     def _generate_pdf(self, measurements):
         buffer = io.BytesIO()
-
-        doc = SimpleDocTemplate(buffer, pagesize=A4)
+        doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=72, leftMargin=72, topMargin=72, bottomMargin=18)
         elements = []
+        
         styles = getSampleStyleSheet()
-        title = f"Measurement Export from {self.data['date_from']} to {self.data['date_to']}"
-        elements.append(Paragraph(title, styles['Title']))
-        elements.append(Paragraph("<br/><br/>", styles['Normal']))
+        
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            alignment=TA_CENTER,
+            spaceAfter=30,
+            fontSize=18,
+            textColor=colors.black
+        )
+        
+        station_header_style = ParagraphStyle(
+            'StationHeader',
+            parent=styles['Heading2'],
+            alignment=TA_LEFT,
+            spaceBefore=15,
+            spaceAfter=10,
+            fontSize=14,
+            textColor=colors.black,
+            borderPadding=5,
+        )
 
-        data = [['Time', 'Value', 'Unit', 'Station', 'Pollutant']] 
+        pollutant_header_style = ParagraphStyle(
+            'PollutantHeader',
+            parent=styles['Heading3'],
+            alignment=TA_LEFT,
+            spaceBefore=10,
+            spaceAfter=5,
+            fontSize=12,
+            textColor=colors.dimgray,
+            fontName='Helvetica-Oblique'
+        )
 
-        for m in measurements:
-            data.append([m['time'], str(m['value']), m['unit'], m['station'], m['pollutant']])
-
-        table = Table(data)
-        table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),       
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),  
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),              
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),    
-            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),             
-            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),     
-            ('GRID', (0, 0), (-1, -1), 1, colors.black),        
-        ]))
-
-        elements.append(table)
+        date_from = self.data['date_from'].strftime('%Y-%m-%d')
+        date_to = self.data['date_to'].strftime('%Y-%m-%d')
+        elements.append(Paragraph(f"Raport Pomiarów", title_style))
+        elements.append(Paragraph(f"Okres: {date_from} do {date_to}", styles['Normal']))
+        elements.append(Spacer(1, 20))
+        
+        for station_code, station_group in groupby(measurements, key=itemgetter('station')):
+            elements.append(Paragraph(f"Stacja: {station_code}", station_header_style))
+            
+            station_data = list(station_group)
+            
+            for pollutant_symbol, pollutant_group in groupby(station_data, key=itemgetter('pollutant')):
+                elements.append(Paragraph(f"Zanieczyszczenie: {pollutant_symbol}", pollutant_header_style))
+                
+                table_data = [['Czas', 'Wartosc', 'Jednostka']] 
+                
+                for m in pollutant_group:
+                    val_str = f"{m['value']:.2f}" if isinstance(m['value'], float) else str(m['value'])
+                    table_data.append([m['display_time'], val_str, m['unit']])
+                
+                t = Table(table_data, colWidths=[200, 100, 100])
+                t.setStyle(TableStyle([
+                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                    ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                    ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.whitesmoke),
+                    ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+                    ('BOTTOMPADDING', (0, 0), (-1, 0), 6),
+                ]))
+                
+                elements.append(t)
+                elements.append(Spacer(1, 15))
+            
+            elements.append(Spacer(1, 20))
 
         doc.build(elements)
-
         pdf_value = buffer.getvalue()
         buffer.close()
 

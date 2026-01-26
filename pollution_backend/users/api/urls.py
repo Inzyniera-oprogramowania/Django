@@ -7,6 +7,6 @@ app_name = "users"
 router = DefaultRouter()
 router.register("users", UserViewSet)
 router.register("institutions", InstitutionViewSet)
-router.register(r'api-keys', ApiKeyViewSet, basename='api-keys')
+router.register('api-keys', ApiKeyViewSet, basename='api-keys')
 
 urlpatterns = router.urls

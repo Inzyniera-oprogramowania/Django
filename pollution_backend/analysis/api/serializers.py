@@ -1,12 +1,7 @@
-"""
-Serializers for analysis API endpoints.
-"""
 from rest_framework import serializers
-
+from pollution_backend.sensors.models import Sensor
 
 class AnalysisRequestSerializer(serializers.Serializer):
-    """Request serializer for running analysis."""
-    
     ANALYSIS_TYPES = [
         ("descriptive", "Statystyki opisowe"),
         ("trend", "Analiza trendów"),
@@ -19,34 +14,17 @@ class AnalysisRequestSerializer(serializers.Serializer):
         ("day", "Dzienna"),
     ]
     
-    sensor_id = serializers.IntegerField(
-        help_text="ID czujnika do analizy"
-    )
-    analysis_type = serializers.ChoiceField(
-        choices=ANALYSIS_TYPES,
-        help_text="Typ analizy do wykonania"
-    )
-    date_from = serializers.DateTimeField(
-        help_text="Data początkowa zakresu"
-    )
-    date_to = serializers.DateTimeField(
-        help_text="Data końcowa zakresu"
-    )
+    sensor_id = serializers.IntegerField()
+    analysis_type = serializers.ChoiceField(choices=ANALYSIS_TYPES)
+    date_from = serializers.DateTimeField()
+    date_to = serializers.DateTimeField()
     aggregation = serializers.ChoiceField(
         choices=AGGREGATION_CHOICES,
         default="hour",
-        required=False,
-        help_text="Agregacja czasowa dla analizy trendów"
+        required=False
     )
-    # For period comparison
-    period2_from = serializers.DateTimeField(
-        required=False,
-        help_text="Data początkowa drugiego okresu (dla porównania)"
-    )
-    period2_to = serializers.DateTimeField(
-        required=False,
-        help_text="Data końcowa drugiego okresu (dla porównania)"
-    )
+    period2_from = serializers.DateTimeField(required=False)
+    period2_to = serializers.DateTimeField(required=False)
 
     def validate(self, data):
         if data["analysis_type"] == "comparison":
@@ -56,9 +34,21 @@ class AnalysisRequestSerializer(serializers.Serializer):
                 )
         return data
 
+class QuickStatsRequestSerializer(serializers.Serializer):
+    sensor_id = serializers.IntegerField(required=True)
+    days = serializers.IntegerField(required=False, default=7, min_value=1, max_value=365)
+
+class SensorInfoSerializer(serializers.ModelSerializer):
+    pollutant = serializers.CharField(source='pollutant.symbol', read_only=True)
+    pollutant_name = serializers.CharField(source='pollutant.name', read_only=True)
+    station_code = serializers.CharField(source='monitoring_station.station_code', read_only=True)
+    location = serializers.CharField(source='monitoring_station.location.full_address', read_only=True)
+    
+    class Meta:
+        model = Sensor
+        fields = ['id', 'sensor_type', 'serial_number', 'pollutant', 'pollutant_name', 'station_code', 'location']
 
 class DescriptiveStatsSerializer(serializers.Serializer):
-    """Serializer for descriptive statistics response."""
     count = serializers.IntegerField()
     mean = serializers.FloatField()
     min_value = serializers.FloatField()
@@ -70,15 +60,11 @@ class DescriptiveStatsSerializer(serializers.Serializer):
     percentile_95 = serializers.FloatField()
     unit = serializers.CharField()
 
-
 class DataPointSerializer(serializers.Serializer):
-    """Serializer for time-series data points."""
     time = serializers.CharField()
     value = serializers.FloatField()
 
-
 class TrendAnalysisSerializer(serializers.Serializer):
-    """Serializer for trend analysis response."""
     trend_direction = serializers.CharField()
     percent_change = serializers.FloatField()
     slope = serializers.FloatField()
@@ -86,9 +72,7 @@ class TrendAnalysisSerializer(serializers.Serializer):
     end_avg = serializers.FloatField()
     data_points = DataPointSerializer(many=True)
 
-
 class PeriodComparisonSerializer(serializers.Serializer):
-    """Serializer for period comparison response."""
     period1_avg = serializers.FloatField()
     period2_avg = serializers.FloatField()
     absolute_diff = serializers.FloatField()
@@ -97,22 +81,16 @@ class PeriodComparisonSerializer(serializers.Serializer):
     period2_max = serializers.FloatField()
     better_period = serializers.CharField()
 
-
 class WorstDaySerializer(serializers.Serializer):
-    """Serializer for worst day data."""
     date = serializers.CharField()
     max_value = serializers.FloatField()
     avg_value = serializers.FloatField()
 
-
 class HourlyDistributionSerializer(serializers.Serializer):
-    """Serializer for hourly distribution data."""
     hour = serializers.IntegerField()
     count = serializers.IntegerField()
 
-
 class NormExceedanceSerializer(serializers.Serializer):
-    """Serializer for norm exceedance analysis response."""
     total_measurements = serializers.IntegerField()
     exceedances_count = serializers.IntegerField()
     exceedance_percent = serializers.FloatField()
@@ -121,9 +99,7 @@ class NormExceedanceSerializer(serializers.Serializer):
     worst_days = WorstDaySerializer(many=True)
     hourly_distribution = HourlyDistributionSerializer(many=True)
 
-
 class AnalysisResponseSerializer(serializers.Serializer):
-    """Generic response serializer wrapping analysis results."""
     analysis_type = serializers.CharField()
     sensor_id = serializers.IntegerField()
     date_from = serializers.DateTimeField()
@@ -131,14 +107,9 @@ class AnalysisResponseSerializer(serializers.Serializer):
     sensor_info = serializers.DictField(required=False)
     results = serializers.DictField()
 
-
 class ReportGenerateRequestSerializer(serializers.Serializer):
-    """Request serializer for generating reports."""
     title = serializers.CharField(max_length=255)
-    sensor_ids = serializers.ListField(
-        child=serializers.IntegerField(),
-        help_text="Lista ID czujników do raportu"
-    )
+    sensor_ids = serializers.ListField(child=serializers.IntegerField())
     date_from = serializers.DateTimeField()
     date_to = serializers.DateTimeField()
     include_stats = serializers.BooleanField(default=True)
