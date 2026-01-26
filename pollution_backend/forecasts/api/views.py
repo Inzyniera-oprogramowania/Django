@@ -1,6 +1,6 @@
+from rest_framework.permissions import AllowAny
 from rest_framework import generics
 from rest_framework import status
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -10,7 +10,7 @@ from ...services.aws_lambda import invoke_forecast_lambda, LambdaInvocationError
 
 
 class ForecastAreaListView(generics.ListAPIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
     serializer_class = ForecastAreaSerializer
     pagination_class = None
 
@@ -19,7 +19,7 @@ class ForecastAreaListView(generics.ListAPIView):
 
 
 class TriggerForecastView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     def post(self, request):
         serializer = ForecastRequestSerializer(data=request.data)
@@ -50,7 +50,7 @@ class TriggerForecastView(APIView):
 
 
 class ForecastListView(generics.ListAPIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
     serializer_class = ForecastListSerializer
 
     def get_queryset(self):
@@ -60,7 +60,7 @@ class ForecastListView(generics.ListAPIView):
 
 
 class ForecastDetailView(generics.RetrieveAPIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
     serializer_class = ForecastDetailSerializer
     lookup_field = 'id'
 

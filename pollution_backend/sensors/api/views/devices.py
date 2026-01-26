@@ -4,9 +4,11 @@ from pollution_backend.sensors.api.pagination import DevicePagination
 from pollution_backend.sensors.api.serializers import DeviceSerializer
 from pollution_backend.selectors.devices import get_aggregated_device_list
 from pollution_backend.services.redis_cache import DeviceListCache
+from rest_framework.permissions import IsAdminUser
 
 class DeviceViewSet(viewsets.GenericViewSet):
     pagination_class = DevicePagination
+    permission_classes = [IsAdminUser]
 
     def list(self, request):
         filter_params = {

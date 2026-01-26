@@ -1,3 +1,4 @@
+from rest_framework.permissions import IsAuthenticated, IsAdminUser, SAFE_METHODS
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -11,10 +12,16 @@ from pollution_backend.sensors.api.serializers import (
     PollutantSerializer, QualityNormSerializer
 )
 from pollution_backend.sensors.api.pagination import DevicePagination
+from rest_framework.permissions import IsAdminUser
 
 class SensorViewSet(viewsets.ModelViewSet):
     queryset = Sensor.objects.all()
     pagination_class = DevicePagination
+    
+    def get_permissions(self):
+        if self.request.method in SAFE_METHODS:
+            return [IsAuthenticated()]
+        return [IsAdminUser()]
 
     def get_serializer_class(self):
         if self.action == "create": return SensorCreateSerializer
@@ -87,11 +94,13 @@ class SensorViewSet(viewsets.ModelViewSet):
 class PollutantViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Pollutant.objects.all()
     serializer_class = PollutantSerializer
+    permission_classes = [IsAuthenticated]
     pagination_class = None
     def get_queryset(self): return get_pollutants()
 
 class QualityNormViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = QualityNorm.objects.all()
     serializer_class = QualityNormSerializer
+    permission_classes = [IsAuthenticated]
     pagination_class = None
     def get_queryset(self): return get_norms()
