@@ -1,4 +1,5 @@
 from rest_framework import viewsets
+from rest_framework.permissions import IsAuthenticated, IsAdminUser, SAFE_METHODS
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from drf_spectacular.utils import extend_schema
@@ -19,6 +20,11 @@ from pollution_backend.sensors.api.pagination import DevicePagination
 class MonitoringStationViewSet(viewsets.ModelViewSet):
     queryset = MonitoringStation.objects.all()
     pagination_class = DevicePagination
+
+    def get_permissions(self):
+        if self.request.method in SAFE_METHODS:
+            return [IsAuthenticated()]
+        return [IsAdminUser()]
 
     @extend_schema(exclude=True)
     def list(self, request, *args, **kwargs):
