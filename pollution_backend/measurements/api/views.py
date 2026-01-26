@@ -1,5 +1,7 @@
-from datetime import datetime
+from pollution_backend.users.api.permissions import IsAdvancedUser
+from pollution_backend.measurements.api.pagination import MeasurementPagination, MeasurementCursorPagination
 from django.utils.decorators import method_decorator
+from django.db.models import Q
 from django.db import transaction
 from rest_framework import status, viewsets, mixins
 from rest_framework.permissions import IsAuthenticated
@@ -7,8 +9,10 @@ from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError   
-from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
+from rest_framework.filters import OrderingFilter
+from django_filters import rest_framework as filters
+from pollution_backend.measurements.api.filters import MeasurementFilter
 from pollution_backend.measurements.api.serializers import (
     AggregatedMeasurementSerializer,
     MeasurementSerializer,
@@ -21,14 +25,9 @@ from pollution_backend.selectors.measurements import get_aggregated_measurements
 from pollution_backend.selectors.measurements import get_measurements_for_sensor
 from drf_spectacular.utils import extend_schema
 from pollution_backend.tasks.measurements import import_measurements_task
+from pollution_backend.users.models import ApiKey
 
 SENSOR_ID_REQUIRED = "sensor_id query parameter is required."
-
-
-class MeasurementPagination(PageNumberPagination):
-    page_size = 100
-    page_size_query_param = "page_size"
-    max_page_size = 10000
 
 
 class MeasurementViewSet(
@@ -37,34 +36,18 @@ class MeasurementViewSet(
     mixins.ListModelMixin,
     viewsets.GenericViewSet,
 ):
-    queryset = Measurement.objects.none()
+    queryset = Measurement.objects.all()
     serializer_class = MeasurementSerializer
-    pagination_class = MeasurementPagination
+    pagination_class = MeasurementCursorPagination
+    filter_backends = [filters.DjangoFilterBackend, OrderingFilter]
+    filterset_class = MeasurementFilter
+    ordering_fields = ["time", "value"]
+    ordering = ["-time"]
 
     def get_queryset(self):
         if getattr(self, "swagger_fake_view", False):
             return Measurement.objects.none()
-
-        sensor_id = self.request.query_params.get("sensor_id")
-        if not sensor_id:
-            return Measurement.objects.none()
-
-        date_from = self._parse_date(self.request.query_params.get("date_from"))
-        date_to = self._parse_date(self.request.query_params.get("date_to"))
-
-        return get_measurements_for_sensor(
-            sensor_id=int(sensor_id),
-            date_from=date_from,
-            date_to=date_to,
-        )
-
-    def _parse_date(self, date_str: str | None) -> datetime | None:
-        if not date_str:
-            return None
-        try:
-            return datetime.fromisoformat(date_str.replace("Z", "+00:00"))
-        except ValueError:
-            return None
+        return super().get_queryset()
 
     @action(detail=False, methods=["get"])
     def aggregated(self, request):
@@ -86,8 +69,7 @@ class MeasurementViewSet(
 
 
 class SystemLogViewSet(viewsets.ModelViewSet):
-    
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsAdvancedUser]
     queryset = SystemLog.objects.all()
     serializer_class = SystemLogSerializer
     pagination_class = MeasurementPagination
@@ -97,15 +79,19 @@ class SystemLogViewSet(viewsets.ModelViewSet):
         
         sensor_id = self.request.query_params.get('sensor_id')
         station_id = self.request.query_params.get('station_id')
-        
+        get_all_param = self.request.query_params.get('get_all', 'false')
+        get_all = str(get_all_param).lower() == 'true'
+
         if sensor_id:
             queryset = queryset.filter(sensor_id=sensor_id)
         if station_id:
             queryset = queryset.filter(station_id=station_id)
             
-        if not self.request.user.is_staff:
-            from django.db.models import Q
-            queryset = queryset.filter(Q(user=self.request.user) | Q(user__isnull=True))
+        if self.request.user.is_staff:
+            if not get_all:
+                queryset = queryset.filter(Q(user=self.request.user) | Q(user__isnull=True))
+        else:
+            queryset = queryset.filter(Q(user=self.request.user))
              
         event_types = self.request.query_params.getlist('event_type')
         if event_types:
@@ -141,17 +127,12 @@ class MeasurementImportView(APIView):
                 {"code": "VALIDATION_ERROR", "errors": serializer.errors},
                 status=status.HTTP_422_UNPROCESSABLE_ENTITY
             )
-        
-        if hasattr(request, 'auth') and hasattr(request.auth, 'limit'):
-             if request.auth.request_count >= request.auth.limit:
-                 return Response(
-                    {"detail": "Limit zapytań wyczerpany."}, 
-                    status=status.HTTP_429_TOO_MANY_REQUESTS
-                )
 
         valid_data = serializer.validated_data if is_many else [serializer.validated_data]
         user_id = request.user.id if request.user.is_authenticated else None
-        api_key_id = request.auth.id if hasattr(request, 'auth') else None
+        api_key_id = None
+        if hasattr(request, 'auth') and isinstance(request.auth, ApiKey):
+            api_key_id = request.auth.id
         
         import_measurements_task.delay(valid_data, user_id, api_key_id)
 
