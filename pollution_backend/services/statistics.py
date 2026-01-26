@@ -8,9 +8,7 @@ from django.db.models.functions import TruncDate, TruncHour
 
 from pollution_backend.measurements.models import Measurement
 from pollution_backend.sensors.models import Sensor, QualityNorm
-import logging
 
-logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -70,12 +68,12 @@ def get_descriptive_stats(
         time__lte=date_to,
     )
 
-    logger.info(f"DEBUG: Computing stats for sensor {sensor_id} from {date_from} to {date_to}")
+
     count = queryset.count()
-    logger.info(f"DEBUG: Found {count} measurements")
+
 
     if not queryset.exists():
-        logger.warning("DEBUG: Queryset empty!")
+
         return None
 
     agg = queryset.aggregate(
