@@ -46,7 +46,9 @@ class Command(BaseCommand):
         sensors = Sensor.objects.all()
         for sensor in sensors:
             latest_meas = Measurement.objects.using("timeseries").filter(sensor_id=sensor.id).aggregate(latest=Max("time"))["latest"]
-            latest_log = SystemLog.objects.filter(sensor_id=sensor.id).aggregate(latest=Max("timestamp"))["latest"]
+            latest_log = SystemLog.objects.filter(sensor_id=sensor.id).exclude(
+                event_type__in=["DEVICE_ONLINE", "DEVICE_OFFLINE"]
+            ).aggregate(latest=Max("timestamp"))["latest"]
             
             latest_activity = None
             if latest_meas and latest_log:
@@ -77,7 +79,9 @@ class Command(BaseCommand):
 
         stations = MonitoringStation.objects.all()
         for station in stations:
-            latest_activity = SystemLog.objects.filter(station_id=station.id).aggregate(latest=Max("timestamp"))["latest"]
+            latest_activity = SystemLog.objects.filter(station_id=station.id).exclude(
+                event_type__in=["STATION_ONLINE", "STATION_OFFLINE"]
+            ).aggregate(latest=Max("timestamp"))["latest"]
                 
             is_active = False
             if latest_activity and latest_activity >= threshold:
