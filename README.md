@@ -1,9 +1,33 @@
 # Pollution IoT
 
-Software Engineering class project
+Backend for an IoT-based air pollution monitoring system. The platform collects real-time measurements from distributed sensor stations via MQTT, stores and analyzes pollutant data, and provides pollution forecasting powered by AWS Lambda.
 
 [![Built with Cookiecutter Django](https://img.shields.io/badge/built%20with-Cookiecutter%20Django-ff69b4.svg?logo=cookiecutter)](https://github.com/cookiecutter/cookiecutter-django/)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+
+## Key Features
+
+- **Real-time data ingestion** – MQTT listener receives measurements and device status from IoT sensors, with live updates via WebSockets (Django Channels)
+- **Sensor & station management** – registration, health monitoring, and activity tracking of monitoring stations and their sensors
+- **Anomaly detection** – configurable per-pollutant rules for threshold alerts and sudden-change detection
+- **Pollution forecasting** – on-demand forecast generation delegated to AWS Lambda, with per-pollutant predicted values and uncertainty
+- **Model validation & benchmarking** – trigger validation runs against historical data to evaluate forecast accuracy
+- **Alerts & notifications** – quality-norm-based alerts sent to subscribed users
+- **Reporting** – PDF report generation via ReportLab
+- **REST API** – fully documented with Swagger / OpenAPI (drf-spectacular)
+
+## Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Framework | Django 5.2 / Django REST Framework |
+| Database | PostgreSQL 15 + PostGIS (geospatial support) |
+| Real-time | MQTT (Eclipse Mosquitto) · Django Channels + Redis |
+| Task queue | Celery + Celery Beat (periodic tasks) |
+| Cloud | AWS Lambda (forecasting) · Boto3 |
+| Auth | JWT (Simple JWT) · dj-rest-auth · django-allauth |
+| Containerisation | Docker Compose (local & production) |
+| Python tooling | uv · Ruff · mypy · pytest |
 
 # Test Commands
 
