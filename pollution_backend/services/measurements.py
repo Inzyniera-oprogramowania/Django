@@ -27,12 +27,13 @@ class MeasurementImportService:
             with transaction.atomic():
                 sensor = Sensor.objects.get(id=self.data['sensor_id'])
                 
-                measurement = Measurement.objects.create(
-                    sensor_id=sensor.id,
-                    value=value,
-                    unit=unit,
-                    time=self.data['timestamp']
-                )
+                with transaction.atomic(using='timeseries'):
+                    measurement = Measurement.objects.create(
+                        sensor_id=sensor.id,
+                        value=value,
+                        unit=unit,
+                        time=self.data['timestamp']
+                    )
                 
                 DeviceStatus.objects.update_or_create(
                     sensor=sensor,
@@ -81,7 +82,7 @@ class MeasurementImportService:
                 except Exception as e:
                     logger.error(f"Error processing item: {e}")
 
-            if len(items) > 1:
+            if len(items) > 1 or success_count == 0:
                 msg = f"Batch imported {success_count}/{len(items)} measurements."
             else:
                 msg = f"Imported measurement for sensor {first_sensor_id}."

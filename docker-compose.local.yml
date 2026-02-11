@@ -21,6 +21,7 @@ services:
     env_file:
       - ./.envs/.local/.django
       - ./.envs/.local/.postgres
+
     ports:
       - '8000:8000'
     command: /start
@@ -94,13 +95,13 @@ services:
   activity_monitor:
     <<: *django
     container_name: pollution_backend_local_activity_monitor
-    depends_on:
-      - postgres
-      - redis
     ports: []
-    env_file:
-      - ./.envs/.local/.django
-      - ./.envs/.local/.postgres
     environment:
       - PYTHONUNBUFFERED=1
     command: python manage.py update_device_status --interval 60 --timeout 1
+
+  pytest:
+    <<: *django
+    container_name: pollution_backend_local_pytest
+    ports: []
+    command: pytest

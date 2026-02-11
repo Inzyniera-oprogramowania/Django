@@ -1,11 +1,12 @@
 from collections.abc import Sequence
 from typing import Any
 
+import factory
 from factory import Faker
 from factory import post_generation
 from factory.django import DjangoModelFactory
 
-from pollution_backend.users.models import User
+from pollution_backend.users.models import User, AdvancedUser
 
 
 class UserFactory(DjangoModelFactory[User]):
@@ -37,3 +38,13 @@ class UserFactory(DjangoModelFactory[User]):
     class Meta:
         model = User
         django_get_or_create = ["email"]
+
+
+class AdvancedUserFactory(DjangoModelFactory):
+    user = factory.SubFactory(UserFactory)
+    specialization = Faker("job")
+    employment_date = Faker("date_object")
+
+    class Meta:
+        model = AdvancedUser
+

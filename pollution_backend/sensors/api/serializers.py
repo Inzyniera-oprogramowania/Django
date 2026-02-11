@@ -154,21 +154,6 @@ class SensorCreateSerializer(serializers.ModelSerializer):
         return super().create(validated_data)
 
 
-        fields = [
-            "id",
-            "description",
-            "detected_at",
-            "status",
-            "severity",
-            "sensor",
-            "station_code",
-            "pollutant_symbol",
-            "pollutant_name",
-            "sensor_serial_number",
-        ]
-        read_only_fields = ["id", "description", "detected_at", "sensor", "severity"]
-
-
 class AnomalyRuleSerializer(serializers.ModelSerializer):
     pollutant_symbol = serializers.CharField(source="pollutant.symbol", read_only=True)
     pollutant_name = serializers.CharField(source="pollutant.name", read_only=True)

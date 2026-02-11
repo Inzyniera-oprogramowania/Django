@@ -5,6 +5,28 @@ Software Engineering class project
 [![Built with Cookiecutter Django](https://img.shields.io/badge/built%20with-Cookiecutter%20Django-ff69b4.svg?logo=cookiecutter)](https://github.com/cookiecutter/cookiecutter-django/)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 
+# Test Commands
+
+### Send system log and measurements for sensor ID=2
+
+**Device Status:**
+
+```bash
+python3 scripts/simulate_sensor.py --status --sensor-id 2 --station 1TEST-STATION --status-interval 3 --host localhost
+```
+
+**Measurements:**
+
+```bash
+python3 scripts/simulate_sensor.py --sensor-id 2 --station 1TEST-STATION --pollutant TEST --interval 5 --host localhost
+```
+
+### Station Heartbeat Simulation (Health Check)
+
+```bash
+python3 scripts/simulate_station.py --station 1TEST-STATION --interval 60 --host localhost
+```
+
 ## Settings
 
 Moved to [settings](https://cookiecutter-django.readthedocs.io/en/latest/1-getting-started/settings.html).

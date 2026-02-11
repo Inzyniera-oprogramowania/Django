@@ -18,8 +18,16 @@ def merge(
     for merge_file in files_to_merge:
         merged_content += merge_file.read_text()
         merged_content += "\n"
-    output_file.write_text(merged_content)
 
+    # dla bezpieczeństwa powinno zadziałać
+    # jeśli nie działa to można wywalić
+    resolved_output = output_file.resolve()
+    safe_base_dir = BASE_DIR.resolve()
+
+    if not str(resolved_output).startswith(str(safe_base_dir)):
+        raise ValueError(f"Security Error: Attempted path traversal to {resolved_output}")
+
+    output_file.write_text(merged_content)
 
 if __name__ == "__main__":
     merge(DOTENV_FILE, PRODUCTION_DOTENV_FILES)

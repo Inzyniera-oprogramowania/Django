@@ -12,7 +12,7 @@ class DeviceViewSet(viewsets.GenericViewSet):
 
     def list(self, request):
         filter_params = {
-            "type": request.query_params.get("type", "station"),
+            "type": request.query_params.get("type", "all"),
             "search": request.query_params.get("search", "").strip(),
             "id": request.query_params.get("id", "").strip(),
             "pollutant": request.query_params.get("pollutant", "").strip(),
